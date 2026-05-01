@@ -339,4 +339,68 @@
   </div>
 </div>
 
+<!-- ═══ X（Twitter）スレッド投稿フロー ═══ -->
+<div class="wf-section">
+  <div class="wf-title">
+    <span>🐦</span> X（Twitter）スレッド投稿フロー
+  </div>
+  <div class="wf-steps">
+
+    <div class="wf-step">
+      <div class="wf-num" style="background:#e2e8f0;color:#0f172a;">1</div>
+      <div class="wf-body">
+        <div class="wf-body-title">Xバリアントを作成 <span class="wf-tag wf-tag-app">このアプリ</span></div>
+        <div class="wf-body-desc">
+          「✍️ 記事管理」→「🐦 Xスレッド」タブ → 対象記事の「＋ 作成」をクリック。<br>
+          LinkedIn記事をもとに <code>━━━</code> で区切ってスレッド形式に分割して作成・保存する。<br>
+          <span style="color:#94a3b8;font-size:12px;">※ 各ツイートは140文字以内。最後のツイートにLinkedIn記事URLを追加すると効果的。</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-step">
+      <div class="wf-num" style="background:#e2e8f0;color:#0f172a;">2</div>
+      <div class="wf-body">
+        <div class="wf-body-title">「🐦 X投稿」ボタンをクリック <span class="wf-tag wf-tag-app">このアプリ</span></div>
+        <div class="wf-body-desc">
+          Xスレッドタブの記事一覧から「🐦 X投稿」をクリック。<br>
+          各ツイートの内容を確認・編集し「X にスレッド投稿して投稿済みにする」ボタンを押す。
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-step">
+      <div class="wf-num" style="background:#e2e8f0;color:#0f172a;">3</div>
+      <div class="wf-body">
+        <div class="wf-body-title">X API でスレッド自動投稿 <span class="wf-tag wf-tag-auto">自動</span></div>
+        <div class="wf-body-desc">
+          アプリが X API（Tweepy）経由でツイートを順番に投稿し、スレッドを自動形成する。<br>
+          <span style="color:#94a3b8;font-size:12px;">※ Make不要。X Developer APIを直接利用します。</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-step">
+      <div class="wf-num" style="background:#e2e8f0;color:#0f172a;">4</div>
+      <div class="wf-body">
+        <div class="wf-body-title">ステータスが「投稿済み」に自動更新 <span class="wf-tag wf-tag-auto">自動</span></div>
+        <div class="wf-body-desc">
+          投稿完了と同時にバリアントのURLとステータスが自動更新される。手動操作は不要。
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="tip-box">
+    <strong>💡 Xスレッド投稿のポイント</strong><br>
+    LinkedIn 投稿と同日または翌日に X に展開するとリーチを広げられます。<br>
+    1ツイート目の冒頭3行で引きつけ、最後のツイートに LinkedIn 記事URLを入れると流入が増えます。<br>
+    投稿結果は
+    <a href="https://x.com" target="_blank" rel="noopener"
+       style="color:#0077B5;font-weight:600;">x.com →</a>
+    で確認できます。
+  </div>
+</div>
+
 {% endblock %}
