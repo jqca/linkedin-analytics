@@ -91,6 +91,8 @@
   .wf-tag-note   { background: #f0fdf4; color: #15803d; }
   .wf-tag-linked { background: #dbeafe; color: #1d4ed8; }
   .wf-tag-auto   { background: #dcfce7; color: #15803d; }
+  .wf-tag-zenn   { background: #dbeffe; color: #1a6fb5; }
+  .wf-num-zenn   { background: #dbeffe; color: #1a6fb5; }
 
   .tip-box {
     background: #f0f9ff;
@@ -255,12 +257,12 @@
 <!-- ═══ Zenn 自動投稿フロー ═══ -->
 <div class="wf-section">
   <div class="wf-title">
-    <span>📘</span> Zenn 記事投稿フロー（GitHub 経由で完全自動化）
+    <span>📘</span> Zenn 記事投稿フロー（GitHub 経由で完全自動化済み）
   </div>
   <div class="wf-steps">
 
     <div class="wf-step">
-      <div class="wf-num wf-num-blue">1</div>
+      <div class="wf-num wf-num-zenn">1</div>
       <div class="wf-body">
         <div class="wf-body-title">Zennバリアントを開く <span class="wf-tag wf-tag-app">このアプリ</span></div>
         <div class="wf-body-desc">
@@ -270,7 +272,7 @@
     </div>
 
     <div class="wf-step">
-      <div class="wf-num wf-num-blue">2</div>
+      <div class="wf-num wf-num-zenn">2</div>
       <div class="wf-body">
         <div class="wf-body-title">AI で記事をZenn向けに2,000文字に拡張 <span class="wf-tag wf-tag-app">このアプリ</span></div>
         <div class="wf-body-desc">
@@ -281,7 +283,7 @@
     </div>
 
     <div class="wf-step">
-      <div class="wf-num wf-num-blue">3</div>
+      <div class="wf-num wf-num-zenn">3</div>
       <div class="wf-body">
         <div class="wf-body-title">内容を確認して保存 <span class="wf-tag wf-tag-app">このアプリ</span></div>
         <div class="wf-body-desc">
@@ -291,7 +293,7 @@
     </div>
 
     <div class="wf-step">
-      <div class="wf-num wf-num-blue">4</div>
+      <div class="wf-num wf-num-zenn">4</div>
       <div class="wf-body">
         <div class="wf-body-title">「📘 Zenn投稿」ボタンをクリック <span class="wf-tag wf-tag-app">このアプリ</span></div>
         <div class="wf-body-desc">
@@ -302,22 +304,21 @@
     </div>
 
     <div class="wf-step">
-      <div class="wf-num wf-num-blue">5</div>
+      <div class="wf-num wf-num-zenn">5</div>
       <div class="wf-body">
-        <div class="wf-body-title">GitHub → Zenn に自動公開 <span class="wf-tag wf-tag-auto">自動</span></div>
+        <div class="wf-body-title">GitHub → Zenn に自動公開 <span class="wf-tag wf-tag-zenn">Zenn</span> <span class="wf-tag wf-tag-auto">自動</span></div>
         <div class="wf-body-desc">
-          アプリが GitHub API 経由で Markdown ファイルをコミット。Zenn が自動で記事を公開する。<br>
-          <span style="color:#94a3b8;font-size:12px;">※ Zenn と GitHub リポジトリの連携が設定済みである必要があります。</span>
+          アプリが GitHub API 経由で <code>articles/</code> に Markdown ファイルをコミット。Zenn が自動で記事を公開する。
         </div>
       </div>
     </div>
 
     <div class="wf-step">
-      <div class="wf-num wf-num-blue">6</div>
+      <div class="wf-num wf-num-zenn">6</div>
       <div class="wf-body">
-        <div class="wf-body-title">バリアントにZenn URLが自動記録 <span class="wf-tag wf-tag-auto">自動</span></div>
+        <div class="wf-body-title">Zenn URL がバリアントに自動記録 <span class="wf-tag wf-tag-auto">自動</span></div>
         <div class="wf-body-desc">
-          投稿ボタンを押した時点でZennのURLが自動的にバリアントに保存される。手動操作は不要。
+          投稿ボタンを押した時点で Zenn の URL が自動的にバリアントに保存される。手動操作は不要。
         </div>
       </div>
     </div>
@@ -325,13 +326,16 @@
   </div>
 
   <div class="tip-box">
-    <strong>💡 Zenn 連携の事前設定</strong><br>
-    <a href="https://zenn.dev" target="_blank" rel="noopener"
-       style="color:#0077B5;font-weight:600;">zenn.dev</a>
-    でアカウント作成 → GitHub リポジトリを連携 →
-    GitHub Personal Access Token（<code>repo</code>スコープ）を取得 →<br>
-    Railway の Variables に <code>GITHUB_TOKEN</code> と <code>ZENN_GITHUB_REPO</code> を追加してください。<br>
-    LinkedIn 投稿の2〜3日後に Zenn に展開するとエンジニア層への認知を広げられます。
+    <strong>💡 Zenn 投稿のポイント</strong><br>
+    LinkedIn 投稿の2〜3日後に Zenn に展開するとエンジニア層への認知を広げられます。<br>
+    トピックに <code>quantum</code> / <code>ai</code> / <code>startup</code> を指定すると関連読者に届きやすくなります。<br>
+    投稿結果は
+    <a href="https://zenn.dev/dashboard" target="_blank" rel="noopener"
+       style="color:#0077B5;font-weight:600;">Zenn ダッシュボード →</a>
+    または
+    <a href="https://github.com/jqca/zenn-content" target="_blank" rel="noopener"
+       style="color:#0077B5;font-weight:600;">GitHub リポジトリ →</a>
+    で確認できます。
   </div>
 </div>
 
