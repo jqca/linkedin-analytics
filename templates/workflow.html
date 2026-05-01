@@ -1,0 +1,250 @@
+{% extends "base_app.html" %}
+{% block title %}運用フロー — LinkedIn Analytics{% endblock %}
+
+{% block head %}
+<style>
+  .wf-section {
+    margin-bottom: 36px;
+  }
+  .wf-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  .wf-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .wf-step {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    position: relative;
+  }
+  .wf-step:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    left: 19px;
+    top: 44px;
+    bottom: -16px;
+    width: 2px;
+    background: #e2e8f0;
+    z-index: 0;
+  }
+  .wf-num {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+    flex-shrink: 0;
+    z-index: 1;
+  }
+  .wf-num-blue  { background: #dbeafe; color: #1d4ed8; }
+  .wf-num-green { background: #dcfce7; color: #15803d; }
+  .wf-body {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px 18px;
+    flex: 1;
+    margin-bottom: 16px;
+  }
+  .wf-body-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 4px;
+  }
+  .wf-body-desc {
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.7;
+  }
+  .wf-body-desc a {
+    color: #0077B5;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .wf-body-desc a:hover { text-decoration: underline; }
+  .wf-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .wf-tag-app    { background: #ede9fe; color: #6d28d9; }
+  .wf-tag-buffer { background: #fef9c3; color: #854d0e; }
+  .wf-tag-note   { background: #f0fdf4; color: #15803d; }
+  .wf-tag-linked { background: #dbeafe; color: #1d4ed8; }
+
+  .tip-box {
+    background: #f0f9ff;
+    border-left: 4px solid #0077B5;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: #334155;
+    line-height: 1.8;
+    margin-top: 8px;
+  }
+  .tip-box strong { color: #0077B5; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title"><span>🔄</span> 運用フロー</div>
+</div>
+
+<!-- ═══ LinkedIn → Buffer → 投稿 ═══ -->
+<div class="wf-section">
+  <div class="wf-title">
+    <span>🔵</span> LinkedIn 投稿フロー（Buffer 経由）
+  </div>
+  <div class="wf-steps">
+
+    <div class="wf-step">
+      <div class="wf-num wf-num-blue">1</div>
+      <div class="wf-body">
+        <div class="wf-body-title">核心主張を確認する <span class="wf-tag wf-tag-app">このアプリ</span></div>
+        <div class="wf-body-desc">
+          「💡 核心主張」メニューから投稿のベースとなる考え方・メッセージを確認する。
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-step">
+      <div class="wf-num wf-num-blue">2</div>
+      <div class="wf-body">
+        <div class="wf-body-title">記事を作成・スケジュール設定 <span class="wf-tag wf-tag-app">このアプリ</span></div>
+        <div class="wf-body-desc">
+          「✍️ 記事管理」→「新規作成」から LinkedIn 用記事（約500文字）を作成。<br>
+          投稿予定日を設定してステータスを「予定」にする。
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-step">
+      <div class="wf-num wf-num-blue">3</div>
+      <div class="wf-body">
+        <div class="wf-body-title">記事本文をコピー <span class="wf-tag wf-tag-app">このアプリ</span></div>
+        <div class="wf-body-desc">
+          記事の編集画面から本文をコピー（Ctrl+A → Ctrl+C）。
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-step">
+      <div class="wf-num wf-num-blue">4</div>
+      <div class="wf-body">
+        <div class="wf-body-title">Buffer に貼り付けて予約投稿 <span class="wf-tag wf-tag-buffer">Buffer</span></div>
+        <div class="wf-body-desc">
+          <a href="https://buffer.com" target="_blank" rel="noopener">buffer.com</a> を開き「New Post」→ LinkedIn を選択 → 本文を貼り付け → 投稿日時を設定 →「Add to Queue」。
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-step">
+      <div class="wf-num wf-num-blue">5</div>
+      <div class="wf-body">
+        <div class="wf-body-title">投稿済みに更新 <span class="wf-tag wf-tag-app">このアプリ</span></div>
+        <div class="wf-body-desc">
+          投稿後、「✍️ 記事管理」から該当記事の「投稿済みにする」ボタンを押してステータスを更新する。
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="tip-box">
+    <strong>💡 Buffer 無料プランのポイント</strong><br>
+    予約投稿は常時10件まで。投稿済みになると枠が空くのでこまめに確認を。<br>
+    チャンネルは3つまで接続可能（LinkedIn・X・noteなど）。
+  </div>
+</div>
+
+<!-- ═══ LinkedIn → note 展開 ═══ -->
+<div class="wf-section">
+  <div class="wf-title">
+    <span>📝</span> note 記事投稿フロー
+  </div>
+  <div class="wf-steps">
+
+    <div class="wf-step">
+      <div class="wf-num wf-num-green">1</div>
+      <div class="wf-body">
+        <div class="wf-body-title">noteバリアントを開く <span class="wf-tag wf-tag-app">このアプリ</span></div>
+        <div class="wf-body-desc">
+          「✍️ 記事管理」→「note」タブ → 対象記事の「📝 note」ボタンをクリック。
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-step">
+      <div class="wf-num wf-num-green">2</div>
+      <div class="wf-body">
+        <div class="wf-body-title">AI で記事を2,000文字に拡張 <span class="wf-tag wf-tag-app">このアプリ</span></div>
+        <div class="wf-body-desc">
+          「🤖 AIで2,000文字に自動拡張」ボタンを押す。<br>
+          30〜90秒ほどで2,000文字以上の note 用記事が自動生成される。
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-step">
+      <div class="wf-num wf-num-green">3</div>
+      <div class="wf-body">
+        <div class="wf-body-title">内容を確認して保存 <span class="wf-tag wf-tag-app">このアプリ</span></div>
+        <div class="wf-body-desc">
+          生成された内容を確認・修正し「💾 保存」を押す。
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-step">
+      <div class="wf-num wf-num-green">4</div>
+      <div class="wf-body">
+        <div class="wf-body-title">note.com に貼り付けて投稿 <span class="wf-tag wf-tag-note">note</span></div>
+        <div class="wf-body-desc">
+          本文をコピー →
+          <a href="https://note.com" target="_blank" rel="noopener">note.com</a> を開く →「✏️ 書く」→「テキスト」→ タイトルと本文を貼り付け →「投稿する」。<br>
+          <span style="color:#94a3b8;font-size:12px;">※ ## 見出しは note のエディタで自動的に見出しスタイルになります。</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-step">
+      <div class="wf-num wf-num-green">5</div>
+      <div class="wf-body">
+        <div class="wf-body-title">URLと公開済みステータスを記録 <span class="wf-tag wf-tag-app">このアプリ</span></div>
+        <div class="wf-body-desc">
+          note の公開 URL をコピーし、アプリのバリアント編集画面の「公開URL」欄に貼り付け。<br>
+          ステータスを「✅ 公開済み」に変更して保存。
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="tip-box">
+    <strong>💡 note 投稿のポイント</strong><br>
+    LinkedIn 投稿の2〜3日後に note に展開すると、同じ内容でも新鮮に読まれやすくなります。<br>
+    note は SEO に強いため、タイトルにキーワードを入れると検索流入が期待できます。
+  </div>
+</div>
+
+{% endblock %}

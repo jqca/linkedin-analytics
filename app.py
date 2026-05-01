@@ -142,6 +142,12 @@ def logout():
     return redirect(url_for("login"))
 
 
+@app.route("/workflow")
+@login_required
+def workflow():
+    return render_template("workflow.html")
+
+
 # ── 核心主張 (Beliefs) ────────────────────────────────────────────────────────
 @app.route("/beliefs")
 @login_required
