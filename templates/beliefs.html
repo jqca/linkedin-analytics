@@ -1,0 +1,79 @@
+{% extends "base_app.html" %}
+{% block title %}核心主張 — LinkedIn Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title"><span>💡</span> 核心主張</div>
+  <button class="btn btn-primary" onclick="toggleAddForm()">＋ 主張を追加</button>
+</div>
+
+<p style="font-size:13px;color:#64748b;margin-bottom:20px;line-height:1.6;">
+  記事の軸となる考え方・哲学を登録します。記事作成時の参照・ブレない一貫性のために使います。
+</p>
+
+<!-- Add Form -->
+<div class="add-form-wrap">
+  <div class="add-form-card" id="addForm">
+    <form method="post" action="/beliefs/add">
+      <div class="form-group">
+        <label>タイトル（主張の見出し）</label>
+        <input type="text" name="title" placeholder="例：研究者目線 vs 事業家目線" required>
+      </div>
+      <div class="form-group">
+        <label>主張の内容</label>
+        <textarea name="content" rows="5" placeholder="この主張の核心を自分の言葉で書く..." required></textarea>
+      </div>
+      <div class="row-actions">
+        <button type="submit" class="btn btn-primary">保存</button>
+        <button type="button" class="btn btn-ghost" onclick="toggleAddForm()">キャンセル</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Beliefs List -->
+{% if beliefs %}
+  {% for b in beliefs %}
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+      <div style="flex:1;">
+        <div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:10px;
+                    display:flex;align-items:center;gap:8px;">
+          <span style="display:inline-block;width:4px;height:20px;background:#0077B5;
+                       border-radius:2px;flex-shrink:0;"></span>
+          {{ b.title }}
+        </div>
+        <div style="font-size:14px;color:#334155;line-height:1.75;white-space:pre-wrap;">{{ b.content }}</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:12px;">
+          登録日: {{ b.created_at[:10] }}
+        </div>
+      </div>
+      <div class="row-actions" style="flex-shrink:0;">
+        <a href="/beliefs/{{ b.id }}/edit" class="btn btn-ghost btn-sm">編集</a>
+        <form method="post" action="/beliefs/{{ b.id }}/delete"
+              onsubmit="return confirm('この主張を削除しますか？')">
+          <button type="submit" class="btn btn-danger btn-sm">削除</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="card empty">
+    <div class="empty-icon">💡</div>
+    <div class="empty-text">まだ核心主張が登録されていません。<br>「＋ 主張を追加」から最初の考え方を登録しましょう。</div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleAddForm() {
+  const form = document.getElementById('addForm');
+  form.classList.toggle('open');
+  if (form.classList.contains('open')) {
+    form.querySelector('input[name="title"]').focus();
+  }
+}
+</script>
+{% endblock %}

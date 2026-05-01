@@ -1,0 +1,26 @@
+{% extends "base_app.html" %}
+{% block title %}主張を編集 — LinkedIn Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title"><span>✏️</span> 核心主張を編集</div>
+  <a href="/beliefs" class="btn btn-ghost">← 一覧に戻る</a>
+</div>
+
+<div class="card">
+  <form method="post" action="/beliefs/{{ belief.id }}/edit">
+    <div class="form-group">
+      <label>タイトル（主張の見出し）</label>
+      <input type="text" name="title" value="{{ belief.title }}" required>
+    </div>
+    <div class="form-group">
+      <label>主張の内容</label>
+      <textarea name="content" rows="10">{{ belief.content }}</textarea>
+    </div>
+    <div class="row-actions">
+      <button type="submit" class="btn btn-primary">保存</button>
+      <a href="/beliefs" class="btn btn-ghost">キャンセル</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

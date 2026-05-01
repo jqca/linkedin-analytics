@@ -1,0 +1,89 @@
+{% extends "base_app.html" %}
+{% block title %}記事管理 — LinkedIn Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title"><span>✍️</span> 記事管理</div>
+  <a href="/articles/new" class="btn btn-primary">＋ 新規記事</a>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <a href="/articles?tab=schedule" {% if tab == 'schedule' %}class="active"{% endif %}>📅 スケジュール</a>
+  <a href="/articles?tab=all"      {% if tab == 'all' %}class="active"{% endif %}>📋 すべて</a>
+  <a href="/articles?tab=posted"   {% if tab == 'posted' %}class="active"{% endif %}>✅ 投稿済み</a>
+</div>
+
+{% if articles %}
+  {% for a in articles %}
+  <div class="card" style="position:relative;">
+
+    <!-- Status badge + Date -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      {% if a.status == 'posted' %}
+        <span class="badge badge-posted">✅ 投稿済み</span>
+      {% elif a.status == 'scheduled' %}
+        <span class="badge badge-scheduled">📅 投稿予定</span>
+      {% else %}
+        <span class="badge badge-draft">📝 下書き</span>
+      {% endif %}
+
+      {% if a.scheduled_date %}
+        <span style="font-size:13px;font-weight:700;color:#0077B5;">
+          {{ a.scheduled_date }}
+          {% if a.scheduled_date == '2026-05-07' %}（水）{% elif a.scheduled_date == '2026-05-09' %}（金）{% endif %}
+        </span>
+      {% endif %}
+
+      <span class="char-count" style="margin-left:auto;">
+        {{ a.content | length }} 文字
+      </span>
+    </div>
+
+    <!-- Title -->
+    <div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:8px;">
+      {{ a.title if a.title else '（タイトルなし）' }}
+    </div>
+
+    <!-- Preview (first 3 lines) -->
+    <div style="font-size:13px;color:#475569;line-height:1.7;white-space:pre-wrap;
+                background:#f8fafc;border-radius:8px;padding:12px;margin-bottom:14px;
+                border-left:3px solid #e2e8f0;">{{ a.content | firstlines(3) }}</div>
+
+    <!-- Actions -->
+    <div class="row-actions">
+      <a href="/articles/{{ a.id }}/edit" class="btn btn-ghost btn-sm">✏️ 編集</a>
+
+      {% if a.status != 'posted' %}
+        <form method="post" action="/articles/{{ a.id }}/mark-posted">
+          <button type="submit" class="btn btn-success btn-sm">✅ 投稿済みにする</button>
+        </form>
+      {% endif %}
+
+      <form method="post" action="/articles/{{ a.id }}/delete"
+            onsubmit="return confirm('この記事を削除しますか？')">
+        <button type="submit" class="btn btn-danger btn-sm">削除</button>
+      </form>
+
+      <span style="font-size:11px;color:#cbd5e1;margin-left:4px;">
+        作成: {{ a.created_at[:10] }}
+      </span>
+    </div>
+  </div>
+  {% endfor %}
+
+{% else %}
+  <div class="card empty">
+    <div class="empty-icon">✍️</div>
+    <div class="empty-text">
+      {% if tab == 'posted' %}
+        まだ投稿済みの記事がありません。
+      {% elif tab == 'schedule' %}
+        スケジュールされた記事がありません。<br>「＋ 新規記事」から記事を作成し、投稿予定日を設定しましょう。
+      {% else %}
+        まだ記事がありません。
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
