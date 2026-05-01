@@ -335,33 +335,44 @@ def variant_form(aid, platform):
 @login_required
 def variant_expand_content(aid, platform):
     """AI で LinkedIn 記事を一括拡張して JSON で返す"""
-    if platform not in PLATFORM_KEYS:
-        return jsonify({"error": "invalid platform"}), 400
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        return jsonify({"error": "ANTHROPIC_API_KEY が設定されていません"}), 500
-    if platform != "note":
-        return jsonify({"error": "このプラットフォームはAI拡張未対応です"}), 400
-    conn = get_conn()
-    article = conn.execute("SELECT * FROM articles WHERE id=?", (aid,)).fetchone()
-    conn.close()
-    if not article:
-        return jsonify({"error": "article not found"}), 404
-
-    art_content = article["content"]
-    art_title   = article["title"] or "（タイトルなし）"
-
+    import traceback
     try:
+        if platform not in PLATFORM_KEYS:
+            return jsonify({"error": "invalid platform"}), 400
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            return jsonify({"error": "ANTHROPIC_API_KEY が設定されていません"}), 500
+        if platform != "note":
+            return jsonify({"error": "このプラットフォームはAI拡張未対応です"}), 400
+
+        conn = get_conn()
+        article = conn.execute("SELECT * FROM articles WHERE id=?", (aid,)).fetchone()
+        conn.close()
+        if not article:
+            return jsonify({"error": "article not found"}), 404
+
+        art_content = article["content"] or ""
+        art_title   = article["title"] or "（タイトルなし）"
+
+        # .format() はユーザー入力の {} で KeyError になるため replace で代替
+        prompt = (_NOTE_PROMPT
+                  .replace("{title}", art_title)
+                  .replace("{content}", art_content))
+
         import anthropic
-        client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-        prompt = _NOTE_PROMPT.format(title=art_title, content=art_content)
+        client = anthropic.Anthropic(
+            api_key=os.environ.get("ANTHROPIC_API_KEY"),
+            timeout=90.0,
+        )
         message = client.messages.create(
             model="claude-sonnet-4-5",
-            max_tokens=8000,
+            max_tokens=4000,
             messages=[{"role": "user", "content": prompt}],
         )
         return jsonify({"content": message.content[0].text})
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        detail = traceback.format_exc()[-600:]
+        return jsonify({"error": f"{type(e).__name__}: {e}", "detail": detail}), 500
 
 
 @app.route("/articles/<int:aid>/variants/<platform>/delete", methods=["POST"])
