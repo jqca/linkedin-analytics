@@ -1,6 +1,5 @@
 from flask import (Flask, send_from_directory, session, redirect,
-                   url_for, request, render_template, jsonify,
-                   Response, stream_with_context)
+                   url_for, request, render_template, jsonify)
 from functools import wraps
 from datetime import datetime
 import os
@@ -62,19 +61,6 @@ _NOTE_PROMPT = """\
 
 note記事（## 見出しを使った2,000文字以上の完全版）:"""
 
-
-def _stream_note_expansion(content: str, title: str = ""):
-    """LinkedIn記事をnote用にストリーミング拡張するジェネレーター"""
-    import anthropic
-    client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-    prompt = _NOTE_PROMPT.format(title=title or "（タイトルなし）", content=content)
-    with client.messages.stream(
-        model="claude-sonnet-4-5",
-        max_tokens=6000,
-        messages=[{"role": "user", "content": prompt}],
-    ) as stream:
-        for text in stream.text_stream:
-            yield text
 
 
 # ── テンプレートフィルター ────────────────────────────────────────────────────
@@ -348,7 +334,7 @@ def variant_form(aid, platform):
 @app.route("/articles/<int:aid>/variants/<platform>/expand-content")
 @login_required
 def variant_expand_content(aid, platform):
-    """AI で LinkedIn 記事をストリーミング拡張して text/plain で返す"""
+    """AI で LinkedIn 記事を一括拡張して JSON で返す"""
     if platform not in PLATFORM_KEYS:
         return jsonify({"error": "invalid platform"}), 400
     if not os.environ.get("ANTHROPIC_API_KEY"):
@@ -364,20 +350,18 @@ def variant_expand_content(aid, platform):
     art_content = article["content"]
     art_title   = article["title"] or "（タイトルなし）"
 
-    def generate():
-        try:
-            yield from _stream_note_expansion(art_content, art_title)
-        except Exception as e:
-            yield f"\n\n【生成エラー: {e}】"
-
-    return Response(
-        stream_with_context(generate()),
-        mimetype="text/plain; charset=utf-8",
-        headers={
-            "X-Accel-Buffering": "no",
-            "Cache-Control": "no-cache, no-transform",
-        }
-    )
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+        prompt = _NOTE_PROMPT.format(title=art_title, content=art_content)
+        message = client.messages.create(
+            model="claude-sonnet-4-5",
+            max_tokens=8000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return jsonify({"content": message.content[0].text})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/articles/<int:aid>/variants/<platform>/delete", methods=["POST"])

@@ -182,45 +182,29 @@ function copyOriginal(btn) {
   });
 }
 
-// ── AI拡張（ストリーミング）────────────────────────────────────
+// ── AI拡張（一括生成）────────────────────────────────────────
 async function expandWithAI(btn) {
   const status = document.getElementById('expandStatus');
   btn.disabled = true;
-  btn.textContent = '⏳ AIが執筆中...';
-  if (status) { status.style.display = 'block'; status.textContent = 'Claude がリアルタイムで書き起こし中...'; }
+  btn.textContent = '⏳ AIが執筆中... (30〜60秒)';
+  if (status) { status.style.display = 'block'; status.textContent = 'Claude が記事を生成しています。完了まで少々お待ちください...'; }
   ta.value = '';
   updateCount();
 
   try {
     const res = await fetch(`/articles/{{ article.id }}/variants/{{ platform }}/expand-content`);
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(`サーバーエラー ${res.status}: ${txt.slice(0,120)}`);
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      throw new Error(data.error || `サーバーエラー ${res.status}`);
     }
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder('utf-8');
-    let text = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      text += decoder.decode(value, { stream: true });
-      ta.value = text;
-      updateCount();
-    }
-
-    if (text.includes('【生成エラー:')) {
-      btn.textContent = '❌ 生成エラー — 再試行してください';
-      btn.disabled = false;
-      if (status) status.textContent = text.match(/【生成エラー:(.+?)】/)?.[1] || '';
-    } else {
-      btn.textContent = '✅ 拡張完了 — 内容を確認して保存してください';
-      btn.style.background = '#22c55e';
-      if (status) status.textContent = `${text.length.toLocaleString()} 文字のnote記事が生成されました。`;
-    }
+    ta.value = data.content;
+    updateCount();
+    btn.textContent = '✅ 拡張完了 — 内容を確認して保存してください';
+    btn.style.background = '#22c55e';
+    if (status) status.textContent = `${data.content.length.toLocaleString()} 文字のnote記事が生成されました。`;
   } catch (e) {
-    btn.textContent = '❌ エラー';
+    btn.textContent = '❌ エラー — 再試行してください';
     btn.disabled = false;
     if (status) status.textContent = e.message;
   }
