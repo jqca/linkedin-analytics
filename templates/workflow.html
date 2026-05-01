@@ -87,9 +87,10 @@
     vertical-align: middle;
   }
   .wf-tag-app    { background: #ede9fe; color: #6d28d9; }
-  .wf-tag-buffer { background: #fef9c3; color: #854d0e; }
+  .wf-tag-make   { background: #fdf4ff; color: #7e22ce; }
   .wf-tag-note   { background: #f0fdf4; color: #15803d; }
   .wf-tag-linked { background: #dbeafe; color: #1d4ed8; }
+  .wf-tag-auto   { background: #dcfce7; color: #15803d; }
 
   .tip-box {
     background: #f0f9ff;
@@ -110,10 +111,10 @@
   <div class="page-title"><span>🔄</span> 運用フロー</div>
 </div>
 
-<!-- ═══ LinkedIn → Buffer → 投稿 ═══ -->
+<!-- ═══ LinkedIn 投稿フロー（Make 経由） ═══ -->
 <div class="wf-section">
   <div class="wf-title">
-    <span>🔵</span> LinkedIn 投稿フロー（Buffer 経由）
+    <span>🔵</span> LinkedIn 投稿フロー（Make で自動化済み）
   </div>
   <div class="wf-steps">
 
@@ -141,9 +142,10 @@
     <div class="wf-step">
       <div class="wf-num wf-num-blue">3</div>
       <div class="wf-body">
-        <div class="wf-body-title">記事本文をコピー <span class="wf-tag wf-tag-app">このアプリ</span></div>
+        <div class="wf-body-title">「📤 LinkedIn投稿」ボタンを押す <span class="wf-tag wf-tag-app">このアプリ</span></div>
         <div class="wf-body-desc">
-          記事の編集画面から本文をコピー（Ctrl+A → Ctrl+C）。
+          投稿予定日に「✍️ 記事管理」→「📅 スケジュール」タブを開き、対象記事の「📤 LinkedIn投稿」をクリック。<br>
+          本文を確認・編集して「LinkedIn に投稿して投稿済みにする」ボタンを押す。
         </div>
       </div>
     </div>
@@ -151,10 +153,10 @@
     <div class="wf-step">
       <div class="wf-num wf-num-blue">4</div>
       <div class="wf-body">
-        <div class="wf-body-title">「📤 LinkedIn投稿」ボタンを押す <span class="wf-tag wf-tag-app">このアプリ</span></div>
+        <div class="wf-body-title">Make → LinkedIn に自動投稿 <span class="wf-tag wf-tag-make">Make</span> <span class="wf-tag wf-tag-auto">自動</span></div>
         <div class="wf-body-desc">
-          記事カードの「📤 LinkedIn投稿」をクリック → 本文を確認・編集 →「LinkedIn に投稿して投稿済みにする」ボタンを押す。<br>
-          <span style="color:#94a3b8;font-size:12px;">※ Make の Webhook が呼ばれ、LinkedIn に自動投稿されます。</span>
+          アプリが Make の Webhook を呼び出し、Make が LinkedIn に自動で投稿する。<br>
+          <span style="color:#94a3b8;font-size:12px;">※ Make のシナリオが「ON」になっている必要があります。</span>
         </div>
       </div>
     </div>
@@ -162,9 +164,9 @@
     <div class="wf-step">
       <div class="wf-num wf-num-blue">5</div>
       <div class="wf-body">
-        <div class="wf-body-title">ステータスが自動で「投稿済み」に更新される <span class="wf-tag wf-tag-app">このアプリ</span></div>
+        <div class="wf-body-title">ステータスが「投稿済み」に自動更新 <span class="wf-tag wf-tag-auto">自動</span></div>
         <div class="wf-body-desc">
-          投稿ボタンを押すと Make への送信と同時に、記事ステータスが自動的に「✅ 投稿済み」に更新されます。手動操作は不要です。
+          投稿ボタンを押した時点でアプリのステータスが自動的に「✅ 投稿済み」に変わる。手動操作は不要。
         </div>
       </div>
     </div>
@@ -174,7 +176,9 @@
   <div class="tip-box">
     <strong>💡 Make 連携のポイント</strong><br>
     Make のシナリオが「ON」になっていることを確認してから投稿ボタンを押してください。<br>
-    Make の実行履歴から投稿の成否を確認できます（make.com のダッシュボード → シナリオ → 履歴）。
+    投稿の成否は Make のダッシュボード →「Scenarios」→「History」で確認できます。<br>
+    <a href="https://www.make.com" target="_blank" rel="noopener"
+       style="color:#0077B5;font-weight:600;">make.com を開く →</a>
   </div>
 </div>
 
