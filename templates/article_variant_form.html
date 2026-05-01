@@ -192,11 +192,17 @@ async function expandWithAI(btn) {
   updateCount();
 
   try {
-    const res = await fetch(`/articles/{{ article.id }}/variants/{{ platform }}/expand-content`);
-    const data = await res.json();
-    if (!res.ok || data.error) {
-      throw new Error(data.error || `サーバーエラー ${res.status}`);
+    const res = await fetch(
+      `/articles/{{ article.id }}/variants/{{ platform }}/expand-content`,
+      { credentials: 'same-origin', headers: { 'Accept': 'application/json' } }
+    );
+    const ct = res.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+      const text = await res.text();
+      throw new Error(`サーバーエラー (${res.status}): ${text.replace(/<[^>]+>/g,'').trim().slice(0,200)}`);
     }
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
 
     ta.value = data.content;
     updateCount();
