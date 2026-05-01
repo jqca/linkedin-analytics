@@ -264,6 +264,95 @@ def articles_post_to_zenn(aid):
     )
 
 
+# ── X（Twitter）投稿 ─────────────────────────────────────────────────────────
+
+def _post_to_x(tweets: list[str]) -> str:
+    """Tweepy で X にスレッド投稿する。最初のツイートIDを返す"""
+    import tweepy
+    client = tweepy.Client(
+        consumer_key=os.environ.get("X_CONSUMER_KEY"),
+        consumer_secret=os.environ.get("X_CONSUMER_SECRET"),
+        access_token=os.environ.get("X_ACCESS_TOKEN"),
+        access_token_secret=os.environ.get("X_ACCESS_TOKEN_SECRET"),
+    )
+    reply_to = None
+    first_id = None
+    for tweet in tweets:
+        if not tweet.strip():
+            continue
+        if reply_to:
+            resp = client.create_tweet(text=tweet.strip(),
+                                       in_reply_to_tweet_id=reply_to)
+        else:
+            resp = client.create_tweet(text=tweet.strip())
+        tweet_id = resp.data["id"]
+        if first_id is None:
+            first_id = tweet_id
+        reply_to = tweet_id
+    return first_id
+
+
+@app.route("/articles/<int:aid>/post-to-x", methods=["GET", "POST"])
+@login_required
+def articles_post_to_x(aid):
+    """X（Twitter）にスレッド投稿する確認・送信画面"""
+    missing = [k for k in ("X_CONSUMER_KEY", "X_CONSUMER_SECRET",
+                            "X_ACCESS_TOKEN", "X_ACCESS_TOKEN_SECRET")
+               if not os.environ.get(k)]
+
+    conn = get_conn()
+    article = conn.execute("SELECT * FROM articles WHERE id=?", (aid,)).fetchone()
+    variant = conn.execute(
+        "SELECT * FROM article_variants WHERE article_id=? AND platform='x'",
+        (aid,)
+    ).fetchone()
+    conn.close()
+    if not article:
+        return redirect(url_for("articles_list"))
+
+    # X バリアントの本文（なければ元記事）を ━━━ で分割
+    raw = (variant["content"] if variant and variant["content"]
+           else article["content"] or "")
+    tweets = [t.strip() for t in raw.split("━━━") if t.strip()]
+    if not tweets:
+        tweets = [raw.strip()]
+
+    if request.method == "POST":
+        # フォームから個別ツイートを受け取る
+        tweets_post = request.form.getlist("tweet")
+        tweets_post = [t.strip() for t in tweets_post if t.strip()]
+
+        if missing:
+            return render_template("x_post.html", article=article, variant=variant,
+                                   tweets=tweets_post, error=f"環境変数が未設定: {', '.join(missing)}")
+        try:
+            first_id = _post_to_x(tweets_post)
+            x_url = f"https://x.com/{os.environ.get('X_USERNAME', 'i')}/status/{first_id}"
+        except Exception as e:
+            return render_template("x_post.html", article=article, variant=variant,
+                                   tweets=tweets_post, error=f"投稿エラー: {e}")
+
+        # バリアント URL を更新 & 投稿済みに
+        conn = get_conn()
+        if variant:
+            conn.execute(
+                "UPDATE article_variants SET url=?, status='published', "
+                "updated_at=datetime('now') WHERE id=?",
+                (x_url, variant["id"])
+            )
+        conn.execute(
+            "UPDATE articles SET status='posted', updated_at=datetime('now') WHERE id=?",
+            (aid,)
+        )
+        conn.commit()
+        conn.close()
+        return redirect(url_for("articles_list", tab="x"))
+
+    error = f"環境変数が未設定: {', '.join(missing)}" if missing else None
+    return render_template("x_post.html", article=article, variant=variant,
+                           tweets=tweets, error=error)
+
+
 # ── YouTube 字幕取得 & 要約 ───────────────────────────────────────────────────
 
 _YT_SUMMARY_PROMPT = """\

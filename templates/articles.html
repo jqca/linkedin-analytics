@@ -87,6 +87,13 @@
             📘 Zenn投稿
           </a>
           {% endif %}
+          {% if tab == 'x' and v.status != 'published' %}
+          <a href="/articles/{{ a.id }}/post-to-x"
+             class="btn btn-sm"
+             style="background:#000;color:#fff;font-weight:700;">
+            🐦 X投稿
+          </a>
+          {% endif %}
         {% else %}
           <span style="color:#94a3b8;font-size:12px;">ー 未作成</span>
           <a href="/articles/{{ a.id }}/variants/{{ tab }}" class="btn btn-primary btn-sm">＋ 作成</a>

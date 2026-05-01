@@ -1,0 +1,165 @@
+{% extends "base_app.html" %}
+{% block title %}X 投稿 — LinkedIn Analytics{% endblock %}
+
+{% block head %}
+<style>
+  .x-tweet-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    position: relative;
+  }
+  .x-tweet-num {
+    font-size: 11px;
+    font-weight: 700;
+    color: #94a3b8;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .x-tweet-card textarea {
+    font-size: 13px;
+    line-height: 1.75;
+    background: #f8fafc;
+    min-height: 80px;
+    resize: vertical;
+  }
+  .x-char-count {
+    font-size: 11px;
+    text-align: right;
+    margin-top: 4px;
+  }
+  .x-thread-line {
+    width: 2px;
+    height: 16px;
+    background: #e2e8f0;
+    margin: 0 auto 0 19px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title"><span>🐦</span> X 投稿（スレッド）</div>
+  <a href="/articles?tab=x" class="btn btn-ghost">← X一覧に戻る</a>
+</div>
+
+{% if article %}
+<div style="background:#f0f9ff;border-radius:8px;padding:10px 16px;margin-bottom:20px;
+            font-size:13px;color:#334155;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+  <span>記事:</span>
+  <strong>{{ article.title if article.title else '（タイトルなし）' }}</strong>
+  {% if article.scheduled_date %}
+  <span style="color:#0077B5;font-weight:700;">{{ article.scheduled_date }}</span>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if error %}
+<div class="card" style="border-left:4px solid #ef4444;background:#fef2f2;margin-bottom:20px;">
+  <div style="font-size:14px;font-weight:700;color:#dc2626;margin-bottom:6px;">⚠️ エラー</div>
+  <div style="font-size:13px;color:#7f1d1d;line-height:1.7;">{{ error }}</div>
+  {% if '環境変数' in error %}
+  <div style="margin-top:12px;font-size:12px;color:#334155;line-height:2;">
+    Railway の Variables に以下を追加してください：<br>
+    <code style="background:#f1f5f9;padding:2px 8px;border-radius:4px;">X_CONSUMER_KEY</code>
+    <code style="background:#f1f5f9;padding:2px 8px;border-radius:4px;">X_CONSUMER_SECRET</code>
+    <code style="background:#f1f5f9;padding:2px 8px;border-radius:4px;">X_ACCESS_TOKEN</code>
+    <code style="background:#f1f5f9;padding:2px 8px;border-radius:4px;">X_ACCESS_TOKEN_SECRET</code>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<div style="display:grid;grid-template-columns:1fr 260px;gap:24px;align-items:start;">
+
+  <form method="post" id="xForm">
+    <div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:14px;">
+      🐦 ツイート内容（各ツイートを編集できます）
+    </div>
+
+    <div id="tweetsContainer">
+      {% for tweet in tweets %}
+      <div class="x-tweet-card" id="tweet-{{ loop.index0 }}">
+        <div class="x-tweet-num">
+          <span>{{ loop.index }} / {{ tweets|length }}</span>
+          <span class="x-char-count-label" style="font-size:11px;">
+            <span class="x-count" style="color:#22c55e;">0</span> / 140文字
+          </span>
+        </div>
+        <textarea name="tweet" class="x-ta" rows="4"
+                  onInput="updateCount(this)">{{ tweet }}</textarea>
+        <div class="x-over-warn" style="font-size:11px;color:#ef4444;display:none;">
+          ⚠️ 140文字を超えています
+        </div>
+      </div>
+      {% if not loop.last %}
+      <div class="x-thread-line"></div>
+      {% endif %}
+      {% endfor %}
+    </div>
+
+    <div class="row-actions" style="margin-top:16px;">
+      <button type="submit" id="submitBtn" class="btn btn-primary"
+              style="background:#000;padding:10px 28px;font-size:14px;">
+        🐦 X にスレッド投稿して投稿済みにする
+      </button>
+      <a href="/articles?tab=x" class="btn btn-ghost">キャンセル</a>
+    </div>
+  </form>
+
+  <!-- サイドバー -->
+  <div>
+    <div class="card" style="border-left:4px solid #000;">
+      <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:10px;">
+        ⚡ ボタンを押すと…
+      </div>
+      <div style="font-size:12px;color:#475569;line-height:2.1;">
+        1️⃣ 1ツイート目を投稿<br>
+        2️⃣ 返信としてスレッド投稿<br>
+        3️⃣ 記事が「✅ 投稿済み」に更新
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:0;">
+      <div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:8px;">
+        💡 Xスレッドのコツ
+      </div>
+      <div style="font-size:12px;color:#475569;line-height:1.9;">
+        📌 1ツイート目で引きつける<br>
+        📌 各ツイートは140文字以内<br>
+        📌 最後にLinkedIn記事URLを<br>
+        📌 平日朝8〜10時が効果的
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateCount(ta) {
+  const card = ta.closest('.x-tweet-card');
+  const countEl = card.querySelector('.x-count');
+  const warn = card.querySelector('.x-over-warn');
+  const n = ta.value.length;
+  countEl.textContent = n;
+  countEl.style.color = n > 140 ? '#ef4444' : n > 120 ? '#f59e0b' : '#22c55e';
+  warn.style.display = n > 140 ? 'block' : 'none';
+}
+
+// 初期カウント
+document.querySelectorAll('.x-ta').forEach(ta => updateCount(ta));
+
+// 二重送信防止
+document.getElementById('xForm').addEventListener('submit', () => {
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ 投稿中...';
+});
+</script>
+{% endblock %}
