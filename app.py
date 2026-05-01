@@ -1,5 +1,5 @@
 from flask import (Flask, send_from_directory, session, redirect,
-                   url_for, request, render_template)
+                   url_for, request, render_template, jsonify)
 from functools import wraps
 from datetime import datetime
 import os
@@ -36,6 +36,43 @@ PLATFORMS = {
     },
 }
 PLATFORM_KEYS = list(PLATFORMS.keys())
+
+
+# ── AI 拡張 ───────────────────────────────────────────────────────────────────
+
+_NOTE_PROMPT = """\
+以下のLinkedIn記事（約500文字）をnote.com用の記事として2,000〜3,000文字に拡張してください。
+
+【拡張ルール】
+- 元記事の主張・メッセージを核として維持する
+- note向けに読みやすい見出し構成（## サブタイトル）を入れる
+- 各セクションに具体例・背景・エピソードを追加して読み応えを出す
+- 冒頭に読者の課題感に共鳴する「フック」段落を追加する
+- 末尾に「まとめ」と読者への「問いかけ」を追加する
+- 著者（高野秀隆・量子コンピュータ×AI事業家）の文体を維持する
+- 専門的だが読みやすい日本語で書く
+- ━━━ などの区切り線は使わず、## 見出しで構造化する
+
+【タイトル】
+{title}
+
+【LinkedIn記事（元文）】
+{content}
+
+note記事（## 見出しを使った2,000文字以上の完全版）:"""
+
+
+def _expand_for_note(content: str, title: str = "") -> str:
+    """LinkedIn記事をnote用に2,000文字以上へAI拡張する"""
+    import anthropic
+    client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+    prompt = _NOTE_PROMPT.format(title=title or "（タイトルなし）", content=content)
+    message = client.messages.create(
+        model="claude-sonnet-4-5",
+        max_tokens=3000,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return message.content[0].text
 
 
 # ── テンプレートフィルター ────────────────────────────────────────────────────
@@ -304,6 +341,29 @@ def variant_form(aid, platform):
     return render_template("article_variant_form.html",
                            article=article, variant=variant,
                            platform=platform, pinfo=PLATFORMS[platform])
+
+
+@app.route("/articles/<int:aid>/variants/<platform>/expand-content")
+@login_required
+def variant_expand_content(aid, platform):
+    """AI で LinkedIn 記事をプラットフォーム用に拡張して JSON で返す"""
+    if platform not in PLATFORM_KEYS:
+        return jsonify({"error": "invalid platform"}), 400
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return jsonify({"error": "ANTHROPIC_API_KEY が設定されていません"}), 500
+    conn = get_conn()
+    article = conn.execute("SELECT * FROM articles WHERE id=?", (aid,)).fetchone()
+    conn.close()
+    if not article:
+        return jsonify({"error": "article not found"}), 404
+    try:
+        if platform == "note":
+            expanded = _expand_for_note(article["content"], article["title"])
+        else:
+            return jsonify({"error": "このプラットフォームはAI拡張未対応です"}), 400
+        return jsonify({"content": expanded})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/articles/<int:aid>/variants/<platform>/delete", methods=["POST"])

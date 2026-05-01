@@ -43,6 +43,16 @@
             <span id="varCharCount">0</span> 文字
           </span>
         </label>
+        {% if platform == 'note' %}
+        <div style="margin-bottom:6px;">
+          <button type="button" id="expandBtn" onclick="expandWithAI(this)"
+                  class="btn btn-primary btn-sm"
+                  style="width:100%;font-size:13px;padding:8px;">
+            🤖 AIで2,000文字に自動拡張
+          </button>
+          <div id="expandStatus" style="font-size:11px;color:#94a3b8;margin-top:4px;display:none;"></div>
+        </div>
+        {% endif %}
         <textarea name="content" id="varContent" rows="22"
                   style="font-size:13px;line-height:1.75;"
                   placeholder="{{ pinfo.tip }}">{{ variant.content if variant else article.content }}</textarea>
@@ -170,6 +180,34 @@ function copyOriginal(btn) {
     btn.textContent = '✅ コピーしました';
     setTimeout(() => { btn.textContent = '📋 元記事をコピー'; }, 2000);
   });
+}
+
+// ── AI拡張 ────────────────────────────────────────────────────
+async function expandWithAI(btn) {
+  const status = document.getElementById('expandStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ AIが執筆中... (20〜30秒)';
+  if (status) { status.style.display = 'block'; status.textContent = 'Claude がnote向けに2,000文字以上に書き起こしています...'; }
+
+  try {
+    const res = await fetch(`/articles/{{ article.id }}/variants/{{ platform }}/expand-content`);
+    const data = await res.json();
+
+    if (data.content) {
+      ta.value = data.content;
+      updateCount();
+      btn.textContent = '✅ 拡張完了 — 内容を確認して保存してください';
+      btn.style.background = '#22c55e';
+      if (status) status.textContent = `${data.content.length.toLocaleString()}文字のnote記事が生成されました。`;
+    } else {
+      btn.textContent = '❌ エラー: ' + (data.error || '不明');
+      btn.disabled = false;
+    }
+  } catch (e) {
+    btn.textContent = '❌ 通信エラー';
+    btn.disabled = false;
+    if (status) status.textContent = e.message;
+  }
 }
 </script>
 {% endblock %}
