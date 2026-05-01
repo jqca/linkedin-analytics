@@ -13,11 +13,21 @@ APP_PASSWORD = os.environ.get("APP_PASSWORD", "linkedin2026")
 init_db()
 
 
-# ── 文字数・プレビュー用テンプレートフィルター ────────────────────────────────
+# ── テンプレートフィルター ────────────────────────────────────────────────────
 @app.template_filter("firstlines")
 def first_lines_filter(s, n=3):
     lines = [l for l in (s or "").strip().split("\n") if l.strip()]
     return "\n".join(lines[:n])
+
+
+@app.template_filter("datefmt")
+def datefmt_filter(v):
+    """datetime オブジェクトと文字列の両方に対応して YYYY-MM-DD を返す"""
+    if v is None:
+        return ""
+    if hasattr(v, "strftime"):          # PostgreSQL: datetime オブジェクト
+        return v.strftime("%Y-%m-%d")
+    return str(v)[:10]                  # SQLite: 文字列
 
 
 # ── 認証デコレーター ──────────────────────────────────────────────────────────

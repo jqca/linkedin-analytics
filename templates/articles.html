@@ -66,7 +66,7 @@
       </form>
 
       <span style="font-size:11px;color:#cbd5e1;margin-left:4px;">
-        作成: {{ a.created_at[:10] }}
+        作成: {{ a.created_at | datefmt }}
       </span>
     </div>
   </div>

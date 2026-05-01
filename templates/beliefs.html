@@ -45,7 +45,7 @@
         </div>
         <div style="font-size:14px;color:#334155;line-height:1.75;white-space:pre-wrap;">{{ b.content }}</div>
         <div style="font-size:11px;color:#94a3b8;margin-top:12px;">
-          登録日: {{ b.created_at[:10] }}
+          登録日: {{ b.created_at | datefmt }}
         </div>
       </div>
       <div class="row-actions" style="flex-shrink:0;">
