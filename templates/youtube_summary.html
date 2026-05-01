@@ -3,26 +3,47 @@
 
 {% block head %}
 <style>
-  .yt-input-card {
+  .yt-card {
     background: #fff;
     border-radius: 14px;
     padding: 28px;
     box-shadow: 0 2px 10px rgba(0,0,0,.06);
     border: 1px solid #e2e8f0;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
   }
+  .yt-tabs {
+    display: flex;
+    gap: 4px;
+    background: #e2e8f0;
+    padding: 4px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    width: fit-content;
+  }
+  .yt-tabs button {
+    padding: 7px 20px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    background: transparent;
+    color: #64748b;
+    font-family: inherit;
+    transition: all .15s;
+  }
+  .yt-tabs button.active {
+    background: #fff;
+    color: #dc2626;
+    box-shadow: 0 1px 4px rgba(0,0,0,.1);
+  }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
   .yt-url-row {
     display: flex;
     gap: 10px;
-    align-items: flex-start;
   }
-  .yt-url-row input {
-    flex: 1;
-    font-size: 14px;
-  }
-  .yt-result {
-    display: none;
-  }
+  .yt-url-row input { flex: 1; }
   .yt-loading {
     display: none;
     text-align: center;
@@ -32,12 +53,13 @@
     width: 48px;
     height: 48px;
     border: 4px solid #e2e8f0;
-    border-top-color: #ff0000;
+    border-top-color: #dc2626;
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin: 0 auto 16px;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .yt-result { display: none; }
   .yt-summary-box {
     background: #f8fafc;
     border-radius: 10px;
@@ -45,7 +67,6 @@
     font-size: 13px;
     color: #334155;
     line-height: 1.85;
-    white-space: pre-wrap;
     border: 1px solid #e2e8f0;
     max-height: 600px;
     overflow-y: auto;
@@ -59,13 +80,6 @@
     border-bottom: 1px solid #e2e8f0;
   }
   .yt-summary-box h2:first-child { margin-top: 0; }
-  .yt-actions {
-    display: flex;
-    gap: 10px;
-    margin-top: 16px;
-    flex-wrap: wrap;
-    align-items: center;
-  }
   .tip-note {
     font-size: 11px;
     color: #94a3b8;
@@ -75,6 +89,17 @@
     line-height: 1.7;
     margin-top: 12px;
   }
+  .how-to-box {
+    background: #f0f9ff;
+    border-left: 4px solid #0077B5;
+    border-radius: 0 8px 8px 0;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: #334155;
+    line-height: 2;
+    margin-bottom: 16px;
+  }
+  .how-to-box strong { color: #0077B5; }
 </style>
 {% endblock %}
 
@@ -83,55 +108,80 @@
   <div class="page-title"><span>▶️</span> YouTube 動画要約</div>
 </div>
 
-<!-- 入力フォーム -->
-<div class="yt-input-card">
-  <div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:12px;">
-    🔗 YouTube URL を入力して要約を生成
+<!-- タブ切替 -->
+<div class="yt-tabs">
+  <button class="active" onclick="switchTab('auto', this)">🔗 URL から自動取得</button>
+  <button onclick="switchTab('manual', this)">📋 字幕を手動入力</button>
+</div>
+
+<!-- ── 自動取得タブ ── -->
+<div id="tab-auto" class="tab-panel active">
+  <div class="yt-card">
+    <div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:12px;">
+      YouTube URL を入力して要約を生成
+    </div>
+    <div class="yt-url-row">
+      <input type="url" id="ytUrl"
+             placeholder="https://www.youtube.com/watch?v=..."
+             style="font-size:14px;background:#fff;">
+      <button class="btn btn-primary" id="startBtn" onclick="startAutoSummary()"
+              style="background:#dc2626;white-space:nowrap;padding:10px 20px;">
+        ▶ 要約する
+      </button>
+    </div>
+    <div class="tip-note">
+      💡 字幕（自動生成含む）がある動画が対象です。<br>
+      ※ サーバーの制限でURLからの取得が失敗する場合は「字幕を手動入力」タブをお使いください。
+    </div>
   </div>
-  <div class="yt-url-row">
-    <input type="url" id="ytUrl"
-           placeholder="https://www.youtube.com/watch?v=..."
-           style="background:#fff;">
-    <button class="btn btn-primary" id="startBtn" onclick="startSummary()"
-            style="background:#ff0000;white-space:nowrap;padding:10px 20px;">
+</div>
+
+<!-- ── 手動入力タブ ── -->
+<div id="tab-manual" class="tab-panel">
+  <div class="yt-card">
+    <div class="how-to-box">
+      <strong>📖 字幕テキストの取得方法</strong><br>
+      1. YouTube で動画を開く<br>
+      2. 動画下の「<strong>…</strong>」→「<strong>文字起こしを開く</strong>」をクリック<br>
+      3. 右側に表示された文字起こし全体を選択してコピー<br>
+      4. 下のテキストエリアに貼り付けて「要約する」を押す
+    </div>
+    <div class="form-group" style="margin-bottom:12px;">
+      <label>字幕テキスト（文字起こし）を貼り付け</label>
+      <textarea id="manualTranscript" rows="10"
+                style="font-size:13px;line-height:1.7;background:#fff;"
+                placeholder="YouTubeの「文字起こし」テキストをここに貼り付けてください..."></textarea>
+    </div>
+    <button class="btn btn-primary" id="manualStartBtn" onclick="startManualSummary()"
+            style="background:#dc2626;padding:10px 24px;">
       ▶ 要約する
     </button>
-  </div>
-  <div class="tip-note">
-    💡 字幕（自動生成含む）がある動画であれば要約できます。<br>
-    ※ 字幕のない動画や非公開動画は要約できません。
   </div>
 </div>
 
 <!-- ローディング -->
-<div class="yt-loading card" id="loadingArea">
+<div class="yt-loading yt-card" id="loadingArea">
   <div class="yt-spinner"></div>
   <div style="font-size:14px;font-weight:700;color:#334155;margin-bottom:6px;">
-    字幕を取得して要約中...
+    要約中...
   </div>
   <div id="loadingStatus" style="font-size:12px;color:#94a3b8;">少々お待ちください</div>
 </div>
 
 <!-- 要約結果 -->
 <div class="yt-result" id="resultArea">
-  <div class="card" style="border-left:4px solid #ff0000;">
+  <div class="yt-card" style="border-left:4px solid #dc2626;">
     <div style="display:flex;align-items:center;justify-content:space-between;
                 margin-bottom:14px;flex-wrap:wrap;gap:8px;">
       <div style="font-size:14px;font-weight:700;color:#0f172a;">📋 要約結果</div>
       <div id="charInfo" style="font-size:11px;color:#94a3b8;"></div>
     </div>
     <div class="yt-summary-box" id="summaryBox"></div>
-
-    <div class="yt-actions">
-      <button class="btn btn-ghost" onclick="copySummary(this)">
-        📋 要約をコピー
-      </button>
+    <div class="row-actions" style="margin-top:16px;flex-wrap:wrap;">
+      <button class="btn btn-ghost" onclick="copySummary(this)">📋 要約をコピー</button>
       <button class="btn btn-primary" onclick="showArticleForm()"
-              style="background:#0077B5;">
-        ✍️ LinkedIn記事のドラフトを作成
-      </button>
-      <button class="btn btn-ghost" onclick="reset()"
-              style="margin-left:auto;">
+              style="background:#0077B5;">✍️ LinkedIn記事ドラフトを作成</button>
+      <button class="btn btn-ghost" onclick="resetAll()" style="margin-left:auto;">
         🔄 別の動画を要約
       </button>
     </div>
@@ -139,7 +189,7 @@
 
   <!-- 記事ドラフト作成フォーム -->
   <div id="articleFormArea" style="display:none;">
-    <div class="card" style="border-left:4px solid #0077B5;margin-top:0;">
+    <div class="yt-card" style="border-left:4px solid #0077B5;margin-top:0;">
       <div style="font-size:13px;font-weight:700;color:#0077B5;margin-bottom:12px;">
         ✍️ LinkedIn 記事ドラフトを作成
       </div>
@@ -147,7 +197,7 @@
         <div class="form-group">
           <label>記事タイトル</label>
           <input type="text" name="title" id="draftTitle"
-                 placeholder="動画を参考にしたタイトルを入力...">
+                 placeholder="タイトルを入力...">
         </div>
         <div class="form-group">
           <label>
@@ -173,11 +223,12 @@
 
 <!-- エラー表示 -->
 <div id="errorArea" style="display:none;">
-  <div class="card" style="border-left:4px solid #ef4444;background:#fef2f2;">
-    <div style="font-size:14px;font-weight:700;color:#dc2626;margin-bottom:6px;">⚠️ エラー</div>
-    <div id="errorMsg" style="font-size:13px;color:#7f1d1d;line-height:1.7;"></div>
-    <button class="btn btn-ghost btn-sm" onclick="reset()" style="margin-top:12px;">
-      🔄 もう一度試す
+  <div class="yt-card" style="border-left:4px solid #ef4444;background:#fef2f2;">
+    <div style="font-size:14px;font-weight:700;color:#dc2626;margin-bottom:6px;">⚠️ 自動取得に失敗</div>
+    <div id="errorMsg" style="font-size:13px;color:#7f1d1d;line-height:1.7;margin-bottom:12px;"></div>
+    <button class="btn btn-primary" onclick="switchTab('manual', null); resetState();"
+            style="background:#0077B5;">
+      📋 字幕を手動入力する
     </button>
   </div>
 </div>
@@ -188,40 +239,79 @@
 <script>
 let currentSummary = '';
 
-async function startSummary() {
-  const url = document.getElementById('ytUrl').value.trim();
-  if (!url) {
-    alert('YouTube の URL を入力してください');
-    return;
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.yt-tabs button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+  else {
+    const idx = name === 'auto' ? 0 : 1;
+    document.querySelectorAll('.yt-tabs button')[idx].classList.add('active');
   }
+  resetState();
+}
 
-  // UI 切替
+function resetState() {
+  document.getElementById('loadingArea').style.display = 'none';
+  document.getElementById('resultArea').style.display = 'none';
+  document.getElementById('errorArea').style.display = 'none';
+  document.getElementById('articleFormArea').style.display = 'none';
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('manualStartBtn').disabled = false;
+}
+
+function resetAll() {
+  resetState();
+  document.getElementById('ytUrl').value = '';
+  document.getElementById('manualTranscript').value = '';
+}
+
+// ── 自動取得 ───────────────────────────────────────────────
+async function startAutoSummary() {
+  const url = document.getElementById('ytUrl').value.trim();
+  if (!url) { alert('YouTube の URL を入力してください'); return; }
+
   document.getElementById('startBtn').disabled = true;
   document.getElementById('loadingArea').style.display = 'block';
   document.getElementById('resultArea').style.display = 'none';
   document.getElementById('errorArea').style.display = 'none';
-  document.getElementById('articleFormArea').style.display = 'none';
 
+  await runJob('/youtube-summary/start', { url }, '字幕を取得して要約中...');
+}
+
+// ── 手動入力 ───────────────────────────────────────────────
+async function startManualSummary() {
+  const transcript = document.getElementById('manualTranscript').value.trim();
+  if (!transcript) { alert('字幕テキストを貼り付けてください'); return; }
+
+  document.getElementById('manualStartBtn').disabled = true;
+  document.getElementById('loadingArea').style.display = 'block';
+  document.getElementById('resultArea').style.display = 'none';
+  document.getElementById('errorArea').style.display = 'none';
+
+  await runJob('/youtube-summary/manual-start', { transcript }, '要約中...');
+}
+
+// ── 共通ジョブ実行 ─────────────────────────────────────────
+async function runJob(endpoint, body, loadingText) {
+  document.getElementById('loadingStatus').textContent = loadingText;
   try {
-    // 1. ジョブ開始
-    const startRes = await fetch('/youtube-summary/start', {
+    const startRes = await fetch(endpoint, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify(body),
     });
     const startData = await startRes.json();
     if (startData.error) throw new Error(startData.error);
 
     const { job_id } = startData;
-
-    // 2. ポーリング（3秒ごと・最大120秒）
     let elapsed = 0;
     while (elapsed < 120) {
       await new Promise(r => setTimeout(r, 3000));
       elapsed += 3;
       document.getElementById('loadingStatus').textContent =
-        `字幕取得・要約中... ${elapsed}秒経過`;
+        `${loadingText} ${elapsed}秒経過`;
 
       const pollRes = await fetch(`/youtube-summary/status/${job_id}`, {
         credentials: 'same-origin',
@@ -229,12 +319,12 @@ async function startSummary() {
       });
       const job = await pollRes.json();
 
-      if (job.status === 'done') {
-        showResult(job);
-        return;
-      }
+      if (job.status === 'done') { showResult(job); return; }
       if (job.status === 'error') throw new Error(job.error);
-      if (job.status === 'not_found') throw new Error('ジョブが見つかりません（再試行してください）');
+      if (job.status === 'manual_needed') {
+        showManualNeeded(job.error); return;
+      }
+      if (job.status === 'not_found') throw new Error('再試行してください');
     }
     throw new Error('タイムアウト: もう一度お試しください');
 
@@ -243,7 +333,15 @@ async function startSummary() {
     document.getElementById('errorArea').style.display = 'block';
     document.getElementById('errorMsg').textContent = e.message;
     document.getElementById('startBtn').disabled = false;
+    document.getElementById('manualStartBtn').disabled = false;
   }
+}
+
+function showManualNeeded(msg) {
+  document.getElementById('loadingArea').style.display = 'none';
+  document.getElementById('errorArea').style.display = 'block';
+  document.getElementById('errorMsg').textContent = msg;
+  document.getElementById('startBtn').disabled = false;
 }
 
 function showResult(job) {
@@ -251,8 +349,8 @@ function showResult(job) {
   document.getElementById('loadingArea').style.display = 'none';
   document.getElementById('resultArea').style.display = 'block';
   document.getElementById('startBtn').disabled = false;
+  document.getElementById('manualStartBtn').disabled = false;
 
-  // Markdown の ## を <h2> に変換して表示
   const html = job.summary
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
     .replace(/^- (.+)$/gm, '• $1');
@@ -262,6 +360,7 @@ function showResult(job) {
     document.getElementById('charInfo').textContent =
       `字幕 ${job.chars.toLocaleString()} 文字を分析`;
   }
+  document.getElementById('resultArea').scrollIntoView({ behavior: 'smooth' });
 }
 
 function copySummary(btn) {
@@ -273,34 +372,24 @@ function copySummary(btn) {
 
 function showArticleForm() {
   document.getElementById('articleFormArea').style.display = 'block';
-  // 要約の「LinkedIn投稿アイデア」セクションだけ抜き出して本文に入れる
   const ideaMatch = currentSummary.match(/## LinkedIn投稿アイデア\n([\s\S]+?)(?=\n##|$)/);
   const draftContent = document.getElementById('draftContent');
   draftContent.value = ideaMatch
-    ? `【参考：YouTube動画より】\n\n${ideaMatch[1].trim()}`
+    ? `【YouTube動画より】\n\n${ideaMatch[1].trim()}`
     : currentSummary.slice(0, 500);
   updateDraftCount();
   document.getElementById('articleFormArea').scrollIntoView({ behavior: 'smooth' });
 }
 
 function updateDraftCount() {
-  const n = document.getElementById('draftContent').value.length;
-  document.getElementById('draftCount').textContent = n.toLocaleString();
+  const el = document.getElementById('draftContent');
+  if (el) document.getElementById('draftCount').textContent =
+    el.value.length.toLocaleString();
 }
 document.getElementById('draftContent')?.addEventListener('input', updateDraftCount);
 
-function reset() {
-  document.getElementById('loadingArea').style.display = 'none';
-  document.getElementById('resultArea').style.display = 'none';
-  document.getElementById('errorArea').style.display = 'none';
-  document.getElementById('startBtn').disabled = false;
-  document.getElementById('ytUrl').value = '';
-  document.getElementById('ytUrl').focus();
-}
-
-// Enter キーで送信
 document.getElementById('ytUrl').addEventListener('keydown', e => {
-  if (e.key === 'Enter') startSummary();
+  if (e.key === 'Enter') startAutoSummary();
 });
 </script>
 {% endblock %}

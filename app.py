@@ -310,46 +310,17 @@ def _extract_video_id(url: str):
     return None
 
 
-def _run_yt_summary(job_id: str, video_id: str) -> None:
-    """バックグラウンドで YouTube 字幕を取得し Claude で要約する"""
+def _run_claude_summary(job_id: str, transcript_text: str, title: str = "（YouTube動画）") -> None:
+    """字幕テキストを Claude で要約する（共通処理）"""
     try:
-        from youtube_transcript_api import (
-            YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
-        )
-
-        # 字幕取得（日本語 → 英語 → 全言語の順で試みる）
-        transcript_list = None
-        try:
-            transcript_list = YouTubeTranscriptApi.get_transcript(
-                video_id, languages=['ja', 'ja-JP'])
-        except (NoTranscriptFound, Exception):
-            try:
-                transcript_list = YouTubeTranscriptApi.get_transcript(
-                    video_id, languages=['en'])
-            except (NoTranscriptFound, Exception):
-                try:
-                    all_transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
-                    for t in all_transcripts:
-                        transcript_list = t.fetch()
-                        break
-                except Exception:
-                    pass
-
-        if not transcript_list:
-            raise Exception("この動画には字幕がありません。字幕がある動画をお試しください。")
-
-        # 字幕テキストを結合（最大12,000文字）
-        full_text = ' '.join([t['text'] for t in transcript_list])
-        excerpt = full_text[:12000]
-
-        # Claude で要約
         import anthropic
         client = anthropic.Anthropic(
             api_key=os.environ.get("ANTHROPIC_API_KEY"),
             timeout=100.0,
         )
+        excerpt = transcript_text[:12000]
         prompt = (_YT_SUMMARY_PROMPT
-                  .replace("{title}", "（YouTube動画）")
+                  .replace("{title}", title)
                   .replace("{transcript}", excerpt))
         message = client.messages.create(
             model="claude-sonnet-4-5",
@@ -360,11 +331,61 @@ def _run_yt_summary(job_id: str, video_id: str) -> None:
             _yt_jobs[job_id] = {
                 "status": "done",
                 "summary": message.content[0].text,
-                "chars": len(full_text),
+                "chars": len(transcript_text),
             }
     except Exception as e:
         with _yt_jobs_lock:
             _yt_jobs[job_id] = {"status": "error", "error": f"{type(e).__name__}: {e}"}
+
+
+def _run_yt_summary(job_id: str, video_id: str) -> None:
+    """バックグラウンドで YouTube 字幕を取得し Claude で要約する"""
+    try:
+        from youtube_transcript_api import YouTubeTranscriptApi
+
+        transcript_list = None
+        last_error = ""
+        for langs in (['ja', 'ja-JP'], ['en'], None):
+            try:
+                if langs:
+                    transcript_list = YouTubeTranscriptApi.get_transcript(
+                        video_id, languages=langs)
+                else:
+                    all_t = YouTubeTranscriptApi.list_transcripts(video_id)
+                    for t in all_t:
+                        transcript_list = t.fetch()
+                        break
+                if transcript_list:
+                    break
+            except Exception as e:
+                last_error = str(e)
+
+        if not transcript_list:
+            # YouTube が IP ブロックしている場合のメッセージ
+            if "blocked" in last_error.lower() or "ipblock" in last_error.lower():
+                raise Exception(
+                    "IPBLOCK: YouTubeがサーバーIPをブロックしています。"
+                    "下の「字幕を手動入力」から字幕テキストを貼り付けて要約してください。"
+                )
+            raise Exception(
+                f"NOTFOUND: 字幕が取得できませんでした（{last_error or '字幕なし'}）。"
+                "下の「字幕を手動入力」から字幕テキストを貼り付けてください。"
+            )
+
+        full_text = ' '.join([t['text'] for t in transcript_list])
+        _run_claude_summary(job_id, full_text)
+
+    except Exception as e:
+        err = str(e)
+        # IPBLOCK / NOTFOUND フラグをフロントに渡す
+        if err.startswith("IPBLOCK:") or err.startswith("NOTFOUND:"):
+            with _yt_jobs_lock:
+                _yt_jobs[job_id] = {"status": "manual_needed", "error": err.split(":", 1)[1].strip()}
+        else:
+            with _yt_jobs_lock:
+                _yt_jobs[job_id] = {"status": "manual_needed",
+                                    "error": f"字幕の自動取得に失敗しました（{err}）。"
+                                             "下の「字幕を手動入力」から字幕テキストを貼り付けてください。"}
 
 
 @app.route("/youtube-summary", methods=["GET"])
@@ -405,6 +426,29 @@ def youtube_summary_status(job_id):
         with _yt_jobs_lock:
             _yt_jobs.pop(job_id, None)
     return jsonify(job)
+
+
+@app.route("/youtube-summary/manual-start", methods=["POST"])
+@login_required
+def youtube_summary_manual_start():
+    """手動で貼り付けた字幕テキストを Claude で要約する"""
+    data = request.get_json(silent=True) or {}
+    transcript = data.get("transcript", "").strip()
+    if not transcript:
+        return jsonify({"error": "字幕テキストを入力してください"}), 400
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return jsonify({"error": "ANTHROPIC_API_KEY が設定されていません"}), 500
+
+    job_id = str(uuid.uuid4())
+    with _yt_jobs_lock:
+        _yt_jobs[job_id] = {"status": "running"}
+
+    threading.Thread(
+        target=_run_claude_summary,
+        args=(job_id, transcript),
+        daemon=True,
+    ).start()
+    return jsonify({"job_id": job_id})
 
 
 @app.route("/youtube-summary/create-article", methods=["POST"])
