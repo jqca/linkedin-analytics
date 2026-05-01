@@ -1,0 +1,185 @@
+{% extends "base_app.html" %}
+{% block title %}Zenn 投稿 — LinkedIn Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title"><span>📘</span> Zenn 投稿</div>
+  <a href="/articles?tab=zenn" class="btn btn-ghost">← Zenn一覧に戻る</a>
+</div>
+
+{% if article %}
+<!-- 元記事ヘッダー -->
+<div style="background:#f0f9ff;border-radius:8px;padding:10px 16px;margin-bottom:20px;
+            font-size:13px;color:#334155;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+  <span>記事:</span>
+  <strong>{{ article.title if article.title else '（タイトルなし）' }}</strong>
+  {% if article.scheduled_date %}
+  <span style="color:#0077B5;font-weight:700;">{{ article.scheduled_date }}</span>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if error and 'GITHUB_TOKEN' in error or error and 'ZENN_GITHUB_REPO' in error %}
+<!-- 未設定エラー -->
+<div class="card" style="border-left:4px solid #ef4444;background:#fef2f2;">
+  <div style="font-size:14px;font-weight:700;color:#dc2626;margin-bottom:8px;">⚠️ 設定が必要です</div>
+  <div style="font-size:13px;color:#7f1d1d;line-height:1.7;">{{ error }}</div>
+
+  <div style="margin-top:16px;padding:14px;background:#fff;border-radius:8px;
+              font-size:13px;color:#334155;line-height:2.1;">
+    <strong>🛠️ Zenn 自動投稿の設定手順：</strong><br>
+    <strong>① Zenn アカウントを作成</strong><br>
+    &nbsp;&nbsp;&nbsp;<a href="https://zenn.dev" target="_blank" rel="noopener"
+       style="color:#0077B5;">zenn.dev</a> でアカウント作成・GitHub 連携を設定<br>
+    <strong>② GitHub リポジトリを作成</strong><br>
+    &nbsp;&nbsp;&nbsp;例: <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">your-name/zenn-content</code><br>
+    &nbsp;&nbsp;&nbsp;リポジトリで <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">npx zenn init</code> を実行<br>
+    <strong>③ Zenn に GitHub リポジトリを連携</strong><br>
+    &nbsp;&nbsp;&nbsp;Zenn ダッシュボード → 「GitHubからのデプロイ」でリポジトリを接続<br>
+    <strong>④ GitHub Personal Access Token を取得</strong><br>
+    &nbsp;&nbsp;&nbsp;GitHub → Settings → Developer settings → Personal access tokens → <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">repo</code> スコープを付与<br>
+    <strong>⑤ Railway に環境変数を追加</strong><br>
+    &nbsp;&nbsp;&nbsp;<code style="background:#f1f5f9;padding:2px 8px;border-radius:4px;">GITHUB_TOKEN = ghp_xxxxxxxxxxxx</code><br>
+    &nbsp;&nbsp;&nbsp;<code style="background:#f1f5f9;padding:2px 8px;border-radius:4px;">ZENN_GITHUB_REPO = your-name/zenn-content</code>
+  </div>
+</div>
+
+{% else %}
+<!-- 投稿フォーム -->
+<div style="display:grid;grid-template-columns:1fr 280px;gap:24px;align-items:start;">
+
+  <form method="post">
+
+    <div class="form-group">
+      <label>記事タイトル</label>
+      <input type="text" name="title" id="titleInput"
+             value="{{ title_default }}"
+             style="font-size:14px;"
+             placeholder="Zenn 記事のタイトル...">
+    </div>
+
+    <div style="display:grid;grid-template-columns:140px 1fr;gap:16px;margin-bottom:16px;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label>絵文字</label>
+        <input type="text" name="emoji" id="emojiInput"
+               value="🔬"
+               style="font-size:22px;text-align:center;padding:8px;"
+               placeholder="🔬" maxlength="2">
+        <div style="font-size:10px;color:#94a3b8;margin-top:3px;">記事のアイコン絵文字</div>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>トピック（カンマ区切り・最大5個）</label>
+        <input type="text" name="topics"
+               value="quantum, ai, business"
+               style="font-size:13px;"
+               placeholder="quantum, ai, business">
+        <div style="font-size:10px;color:#94a3b8;margin-top:3px;">
+          Zenn で使えるトピック例: quantum / ai / python / startup / business
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>
+        本文（Markdown）
+        <span style="float:right;font-size:12px;color:#94a3b8;">
+          <span id="zennCharCount">0</span> 文字
+        </span>
+      </label>
+      <textarea name="body" id="bodyArea" rows="24"
+                style="font-size:13px;line-height:1.75;font-family:monospace;">{{ body_default }}</textarea>
+    </div>
+
+    {% if error %}
+    <div style="background:#fef2f2;border-left:3px solid #ef4444;padding:10px 14px;
+                border-radius:0 6px 6px 0;font-size:13px;color:#dc2626;margin-bottom:12px;">
+      ⚠️ {{ error }}
+    </div>
+    {% endif %}
+
+    <div class="row-actions" style="margin-top:8px;">
+      <button type="submit" id="submitBtn" class="btn btn-primary"
+              style="background:#3ea8ff;padding:10px 28px;font-size:14px;">
+        📘 GitHub にコミット → Zenn に自動投稿
+      </button>
+      <a href="/articles?tab=zenn" class="btn btn-ghost">キャンセル</a>
+    </div>
+  </form>
+
+  <!-- サイドバー -->
+  <div>
+    <div class="card" style="border-left:4px solid #3ea8ff;">
+      <div style="font-size:13px;font-weight:700;color:#1a6fb5;margin-bottom:10px;">
+        ⚡ ボタンを押すと…
+      </div>
+      <div style="font-size:12px;color:#475569;line-height:2.1;">
+        1️⃣ GitHub に <code>.md</code> ファイルをコミット<br>
+        2️⃣ Zenn が自動で記事を公開<br>
+        3️⃣ バリアントに Zenn URL を記録
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:0;">
+      <div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:8px;">
+        💡 Zenn 投稿のコツ
+      </div>
+      <div style="font-size:12px;color:#475569;line-height:1.9;">
+        📌 2,000〜3,000文字が読まれやすい<br>
+        📌 冒頭に「この記事で分かること」<br>
+        📌 技術的な深さ×ビジネス視点が強み<br>
+        📌 トピック指定で検索に引っかかりやすく<br>
+        📌 LinkedIn 投稿の2〜3日後が効果的
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:0;">
+      <div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:8px;">
+        📋 プレビュー
+      </div>
+      <div style="font-size:12px;color:#475569;line-height:1.7;">
+        <a href="https://zenn.dev/dashboard" target="_blank" rel="noopener"
+           style="color:#3ea8ff;text-decoration:none;font-weight:600;">
+          Zenn ダッシュボード →
+        </a><br>
+        投稿後はダッシュボードから記事を確認できます。
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:0;background:#f8fafc;">
+      <div style="font-size:12px;color:#64748b;line-height:1.8;">
+        ⚙️ 連携: <strong>GitHub API</strong> → <strong>Zenn</strong><br>
+        GitHub の <code>articles/</code> フォルダに<br>
+        Markdown ファイルを自動コミットします。
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ta      = document.getElementById('bodyArea');
+const counter = document.getElementById('zennCharCount');
+const btn     = document.getElementById('submitBtn');
+
+function updateCount() {
+  if (!ta) return;
+  const n = ta.value.length;
+  counter.textContent = n.toLocaleString();
+  counter.style.color = n < 800 ? '#94a3b8' : n < 3500 ? '#22c55e' : '#f59e0b';
+}
+
+if (ta) { ta.addEventListener('input', updateCount); updateCount(); }
+
+// 二重送信防止
+const form = document.querySelector('form[method="post"]');
+if (form) {
+  form.addEventListener('submit', () => {
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ GitHubにコミット中...'; }
+  });
+}
+</script>
+{% endblock %}

@@ -43,12 +43,13 @@
             <span id="varCharCount">0</span> 文字
           </span>
         </label>
-        {% if platform == 'note' %}
+        {% if platform == 'note' or platform == 'zenn' %}
         <div style="margin-bottom:6px;">
           <button type="button" id="expandBtn" onclick="expandWithAI(this)"
                   class="btn btn-primary btn-sm"
-                  style="width:100%;font-size:13px;padding:8px;">
-            🤖 AIで2,000文字に自動拡張
+                  style="width:100%;font-size:13px;padding:8px;
+                         {% if platform == 'zenn' %}background:#3ea8ff;{% endif %}">
+            🤖 AIで2,000文字に自動拡張{% if platform == 'zenn' %}（Zenn向け）{% endif %}
           </button>
           <div id="expandStatus" style="font-size:11px;color:#94a3b8;margin-top:4px;display:none;"></div>
         </div>
@@ -162,8 +163,8 @@ const platform = '{{ platform }}';
 function updateCount() {
   const n = ta.value.length;
   counter.textContent = n.toLocaleString();
-  if (platform === 'note') {
-    counter.style.color = n < 800 ? '#94a3b8' : n < 3000 ? '#22c55e' : '#f59e0b';
+  if (platform === 'note' || platform === 'zenn') {
+    counter.style.color = n < 800 ? '#94a3b8' : n < 3500 ? '#22c55e' : '#f59e0b';
   } else if (platform === 'x') {
     counter.style.color = n > 560 ? '#ef4444' : '#22c55e'; // 4ツイート分目安
   } else {
@@ -221,7 +222,8 @@ async function expandWithAI(btn) {
         ta.value = job.content; updateCount();
         btn.textContent = '✅ 拡張完了 — 内容を確認して保存してください';
         btn.style.background = '#22c55e';
-        if (status) status.textContent = `${job.content.length.toLocaleString()} 文字のnote記事が生成されました。`;
+        const label = platform === 'zenn' ? 'Zenn' : 'note';
+        if (status) status.textContent = `${job.content.length.toLocaleString()} 文字の${label}記事が生成されました。`;
         return;
       }
       if (job.status === 'error') throw new Error(job.error || '生成エラー');

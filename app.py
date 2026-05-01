@@ -28,6 +28,12 @@ PLATFORMS = {
         'tip': 'LinkedIn版（約500文字）をベースに2,000〜3,000文字へ拡張。'
                '見出し（#）・具体例・まとめを追加するとSEOに強くなります。',
     },
+    'zenn': {
+        'icon': '📘', 'label': 'Zenn',
+        'tip': 'LinkedIn版をエンジニア・技術者向けに再構成。'
+               '量子×AI×事業化の専門的な内容を技術者目線で深掘りします。'
+               'GitHub連携で自動投稿できます。',
+    },
     'x': {
         'icon': '🐦', 'label': 'Xスレッド',
         'tip': '━━━ ごとに1ツイートに分割。各140文字以内。'
@@ -70,8 +76,31 @@ _NOTE_PROMPT = """\
 
 note記事（## 見出しを使った2,000文字以上の完全版）:"""
 
+_ZENN_PROMPT = """\
+以下のLinkedIn記事（約500文字）をZenn.dev用の技術・ビジネス記事として2,000〜3,000文字に拡張してください。
 
-def _run_expansion(job_id: str, art_content: str, art_title: str) -> None:
+【拡張ルール】
+- 元記事の主張・メッセージを核として維持する
+- Zennの読者層（エンジニア・技術者・スタートアップ関係者）を意識した文体にする
+- ## 見出しで構造化し、技術的な深さとビジネス的な視点を両立する
+- 具体的な技術例・実装イメージ・事業化ステップを追加する
+- 冒頭に「この記事で分かること」を箇条書きで示す
+- 末尾に「まとめ」と「次のアクション」を追加する
+- 著者（高野秀隆・量子コンピュータ×AI事業家）の専門性を活かした内容にする
+- Markdownのコードブロックや引用（>）を適切に使い読みやすくする
+- ━━━ などの区切り線は使わず、## 見出しで構造化する
+
+【タイトル】
+{title}
+
+【LinkedIn記事（元文）】
+{content}
+
+Zenn記事（## 見出しを使った2,000文字以上の完全版、Markdown形式）:"""
+
+
+def _run_expansion(job_id: str, art_content: str, art_title: str,
+                   platform: str = "note") -> None:
     """バックグラウンドスレッドで記事を生成し _expand_jobs に結果を書き込む"""
     try:
         import anthropic
@@ -79,7 +108,8 @@ def _run_expansion(job_id: str, art_content: str, art_title: str) -> None:
             api_key=os.environ.get("ANTHROPIC_API_KEY"),
             timeout=100.0,
         )
-        prompt = (_NOTE_PROMPT
+        base_prompt = _ZENN_PROMPT if platform == "zenn" else _NOTE_PROMPT
+        prompt = (base_prompt
                   .replace("{title}", art_title)
                   .replace("{content}", art_content))
         message = client.messages.create(
@@ -92,6 +122,136 @@ def _run_expansion(job_id: str, art_content: str, art_title: str) -> None:
     except Exception as e:
         with _expand_jobs_lock:
             _expand_jobs[job_id] = {"status": "error", "error": f"{type(e).__name__}: {e}"}
+
+
+# ── GitHub API → Zenn 自動投稿 ────────────────────────────────────────────────
+import base64
+import re
+import unicodedata
+
+def _slugify(text: str, aid: int) -> str:
+    """記事タイトルから Zenn 用スラッグを生成"""
+    text = unicodedata.normalize("NFKC", text)
+    text = re.sub(r"[^\w\s-]", "", text, flags=re.UNICODE).strip().lower()
+    text = re.sub(r"[\s_-]+", "-", text)[:40].strip("-")
+    return f"article-{aid}" if not text else f"{text}-{aid}"
+
+
+def _build_zenn_markdown(title: str, body: str, emoji: str = "🔬",
+                         topics: list = None, published: bool = True) -> str:
+    """Zenn の frontmatter 付き Markdown を生成"""
+    topics = topics or ["quantum", "ai", "business"]
+    topics_yaml = "[" + ", ".join(f'"{t}"' for t in topics) + "]"
+    pub = "true" if published else "false"
+    return (
+        f"---\n"
+        f'title: "{title}"\n'
+        f"emoji: \"{emoji}\"\n"
+        f"type: \"idea\"\n"
+        f"topics: {topics_yaml}\n"
+        f"published: {pub}\n"
+        f"---\n\n"
+        f"{body}"
+    )
+
+
+def _github_commit_file(token: str, repo: str, path: str,
+                        content: str, message: str) -> dict:
+    """GitHub API でファイルを作成・更新する"""
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github+json"}
+
+    # 既存ファイルの SHA を取得（更新時に必要）
+    r = httpx.get(url, headers=headers, timeout=10)
+    sha = r.json().get("sha") if r.status_code == 200 else None
+
+    payload: dict = {
+        "message": message,
+        "content": base64.b64encode(content.encode("utf-8")).decode(),
+    }
+    if sha:
+        payload["sha"] = sha
+
+    r = httpx.put(url, json=payload, headers=headers, timeout=15)
+    r.raise_for_status()
+    return r.json()
+
+
+@app.route("/articles/<int:aid>/post-to-zenn", methods=["GET", "POST"])
+@login_required
+def articles_post_to_zenn(aid):
+    """GitHub 経由で Zenn に自動投稿する確認・送信画面"""
+    github_token = os.environ.get("GITHUB_TOKEN", "")
+    zenn_repo    = os.environ.get("ZENN_GITHUB_REPO", "")
+
+    conn = get_conn()
+    article = conn.execute("SELECT * FROM articles WHERE id=?", (aid,)).fetchone()
+    # Zenn バリアントがあればその本文を使う
+    variant = conn.execute(
+        "SELECT * FROM article_variants WHERE article_id=? AND platform='zenn'",
+        (aid,)
+    ).fetchone()
+    conn.close()
+    if not article:
+        return redirect(url_for("articles_list"))
+
+    body_default = (variant["content"] if variant and variant["content"]
+                    else article["content"] or "")
+    title_default = (variant["title"] if variant and variant["title"]
+                     else article["title"] or "（タイトルなし）")
+
+    # ── POST: GitHub にコミット ──────────────────────────────────────────────
+    if request.method == "POST":
+        title    = request.form.get("title", title_default).strip()
+        body     = request.form.get("body", "").strip()
+        emoji    = request.form.get("emoji", "🔬").strip() or "🔬"
+        topics   = [t.strip() for t in
+                    request.form.get("topics", "quantum,ai,business").split(",") if t.strip()]
+        slug     = _slugify(title, aid)
+        md       = _build_zenn_markdown(title, body, emoji, topics, published=True)
+        path     = f"articles/{slug}.md"
+        msg      = f"Add Zenn article: {title}"
+
+        try:
+            result = _github_commit_file(github_token, zenn_repo, path, md, msg)
+            zenn_url = f"https://zenn.dev/articles/{slug}"
+        except Exception as e:
+            return render_template(
+                "zenn_post.html",
+                article=article, variant=variant,
+                title_default=title_default, body_default=body_default,
+                error=f"GitHub コミットエラー: {e}",
+            )
+
+        # バリアントの URL を更新 & 記事ステータスを投稿済みに
+        conn = get_conn()
+        if variant:
+            conn.execute(
+                "UPDATE article_variants SET url=?, status='published', "
+                "updated_at=datetime('now') WHERE id=?",
+                (zenn_url, variant["id"])
+            )
+        conn.execute(
+            "UPDATE articles SET status='posted', updated_at=datetime('now') WHERE id=?",
+            (aid,)
+        )
+        conn.commit()
+        conn.close()
+        return redirect(url_for("articles_list", tab="zenn"))
+
+    # ── GET: 確認フォーム表示 ────────────────────────────────────────────────
+    error = None
+    if not github_token:
+        error = "GITHUB_TOKEN が設定されていません。"
+    elif not zenn_repo:
+        error = "ZENN_GITHUB_REPO が設定されていません。"
+
+    return render_template(
+        "zenn_post.html",
+        article=article, variant=variant,
+        title_default=title_default, body_default=body_default,
+        error=error,
+    )
 
 
 # ── テンプレートフィルター ────────────────────────────────────────────────────
@@ -441,7 +601,7 @@ def variant_form(aid, platform):
 @login_required
 def variant_expand_start(aid, platform):
     """AI拡張ジョブをバックグラウンドで開始し job_id を即時返す"""
-    if platform != "note":
+    if platform not in ("note", "zenn"):
         return jsonify({"error": "このプラットフォームはAI拡張未対応です"}), 400
     if not os.environ.get("ANTHROPIC_API_KEY"):
         return jsonify({"error": "ANTHROPIC_API_KEY が設定されていません"}), 500
@@ -458,7 +618,7 @@ def variant_expand_start(aid, platform):
 
     thread = threading.Thread(
         target=_run_expansion,
-        args=(job_id, article["content"] or "", article["title"] or "（タイトルなし）"),
+        args=(job_id, article["content"] or "", article["title"] or "（タイトルなし）", platform),
         daemon=True,
     )
     thread.start()

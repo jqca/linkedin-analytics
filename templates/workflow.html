@@ -252,4 +252,87 @@
   </div>
 </div>
 
+<!-- ═══ Zenn 自動投稿フロー ═══ -->
+<div class="wf-section">
+  <div class="wf-title">
+    <span>📘</span> Zenn 記事投稿フロー（GitHub 経由で完全自動化）
+  </div>
+  <div class="wf-steps">
+
+    <div class="wf-step">
+      <div class="wf-num wf-num-blue">1</div>
+      <div class="wf-body">
+        <div class="wf-body-title">Zennバリアントを開く <span class="wf-tag wf-tag-app">このアプリ</span></div>
+        <div class="wf-body-desc">
+          「✍️ 記事管理」→「📘 Zenn」タブ → 対象記事の「＋ 作成」または「編集」をクリック。
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-step">
+      <div class="wf-num wf-num-blue">2</div>
+      <div class="wf-body">
+        <div class="wf-body-title">AI で記事をZenn向けに2,000文字に拡張 <span class="wf-tag wf-tag-app">このアプリ</span></div>
+        <div class="wf-body-desc">
+          「🤖 AIで2,000文字に自動拡張（Zenn向け）」ボタンを押す。<br>
+          エンジニア・技術者向けに再構成された2,000文字以上の記事が自動生成される。
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-step">
+      <div class="wf-num wf-num-blue">3</div>
+      <div class="wf-body">
+        <div class="wf-body-title">内容を確認して保存 <span class="wf-tag wf-tag-app">このアプリ</span></div>
+        <div class="wf-body-desc">
+          生成された内容を確認・修正し「💾 保存」を押す。
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-step">
+      <div class="wf-num wf-num-blue">4</div>
+      <div class="wf-body">
+        <div class="wf-body-title">「📘 Zenn投稿」ボタンをクリック <span class="wf-tag wf-tag-app">このアプリ</span></div>
+        <div class="wf-body-desc">
+          Zennタブの記事一覧から「📘 Zenn投稿」をクリック。<br>
+          タイトル・絵文字・トピックを確認して「GitHubにコミット → Zennに自動投稿」を押す。
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-step">
+      <div class="wf-num wf-num-blue">5</div>
+      <div class="wf-body">
+        <div class="wf-body-title">GitHub → Zenn に自動公開 <span class="wf-tag wf-tag-auto">自動</span></div>
+        <div class="wf-body-desc">
+          アプリが GitHub API 経由で Markdown ファイルをコミット。Zenn が自動で記事を公開する。<br>
+          <span style="color:#94a3b8;font-size:12px;">※ Zenn と GitHub リポジトリの連携が設定済みである必要があります。</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-step">
+      <div class="wf-num wf-num-blue">6</div>
+      <div class="wf-body">
+        <div class="wf-body-title">バリアントにZenn URLが自動記録 <span class="wf-tag wf-tag-auto">自動</span></div>
+        <div class="wf-body-desc">
+          投稿ボタンを押した時点でZennのURLが自動的にバリアントに保存される。手動操作は不要。
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="tip-box">
+    <strong>💡 Zenn 連携の事前設定</strong><br>
+    <a href="https://zenn.dev" target="_blank" rel="noopener"
+       style="color:#0077B5;font-weight:600;">zenn.dev</a>
+    でアカウント作成 → GitHub リポジトリを連携 →
+    GitHub Personal Access Token（<code>repo</code>スコープ）を取得 →<br>
+    Railway の Variables に <code>GITHUB_TOKEN</code> と <code>ZENN_GITHUB_REPO</code> を追加してください。<br>
+    LinkedIn 投稿の2〜3日後に Zenn に展開するとエンジニア層への認知を広げられます。
+  </div>
+</div>
+
 {% endblock %}
