@@ -141,10 +141,10 @@
       <a href="/articles/{{ a.id }}/edit" class="btn btn-ghost btn-sm">✏️ 編集</a>
 
       {% if a.status != 'posted' %}
-        <a href="/articles/{{ a.id }}/send-to-buffer"
+        <a href="/articles/{{ a.id }}/post-to-linkedin"
            class="btn btn-sm"
            style="background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;font-weight:700;">
-          📤 Buffer送信
+          📤 LinkedIn投稿
         </a>
         <form method="post" action="/articles/{{ a.id }}/mark-posted">
           <button type="submit" class="btn btn-success btn-sm">✅ 投稿済みにする</button>

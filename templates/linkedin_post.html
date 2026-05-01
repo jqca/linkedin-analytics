@@ -1,0 +1,139 @@
+{% extends "base_app.html" %}
+{% block title %}LinkedIn 投稿 — LinkedIn Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title"><span>📤</span> LinkedIn 投稿</div>
+  <a href="/articles" class="btn btn-ghost">← 記事一覧に戻る</a>
+</div>
+
+{% if article %}
+<!-- 元記事ヘッダー -->
+<div style="background:#f0f9ff;border-radius:8px;padding:10px 16px;margin-bottom:20px;
+            font-size:13px;color:#334155;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+  <span>記事:</span>
+  <strong>{{ article.title if article.title else '（タイトルなし）' }}</strong>
+  {% if article.scheduled_date %}
+  <span style="color:#0077B5;font-weight:700;">{{ article.scheduled_date }}</span>
+  {% endif %}
+  <span style="color:#94a3b8;">{{ article.content | length }}文字</span>
+</div>
+{% endif %}
+
+{% if error %}
+<!-- エラー・未設定 -->
+<div class="card" style="border-left:4px solid #ef4444;background:#fef2f2;">
+  <div style="font-size:14px;font-weight:700;color:#dc2626;margin-bottom:8px;">⚠️ エラー</div>
+  <div style="font-size:13px;color:#7f1d1d;line-height:1.7;">{{ error }}</div>
+
+  {% if 'MAKE_WEBHOOK_URL' in error %}
+  <div style="margin-top:16px;padding:14px;background:#fff;border-radius:8px;
+              font-size:13px;color:#334155;line-height:2;">
+    <strong>設定手順：</strong><br>
+    1. <a href="https://www.make.com" target="_blank" rel="noopener"
+          style="color:#0077B5;">make.com</a> でシナリオを作成<br>
+    &nbsp;&nbsp;&nbsp;① 「Webhooks」→「Custom webhook」を追加<br>
+    &nbsp;&nbsp;&nbsp;② 「LinkedIn」→「Create a Post」を追加し LinkedIn を認証<br>
+    &nbsp;&nbsp;&nbsp;③「Commentary text」に <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">{{"{{"}}1.content{{"}}"}}</code> を入力<br>
+    &nbsp;&nbsp;&nbsp;④ シナリオを ON にして Webhook URL をコピー<br>
+    2. Railway の「Variables」に以下を追加してデプロイ<br>
+    &nbsp;&nbsp;&nbsp;<code style="background:#f1f5f9;padding:2px 8px;border-radius:4px;">MAKE_WEBHOOK_URL = https://hook.eu1.make.com/xxxxx</code>
+  </div>
+  {% endif %}
+</div>
+
+{% else %}
+<!-- 投稿確認フォーム -->
+<div style="display:grid;grid-template-columns:1fr 280px;gap:24px;align-items:start;">
+
+  <form method="post">
+
+    <div class="form-group">
+      <label>
+        投稿本文（編集可）
+        <span style="float:right;font-size:12px;color:#94a3b8;">
+          <span id="charCount">0</span> / 3,000 文字
+        </span>
+      </label>
+      <textarea name="content" id="contentArea" rows="20"
+                style="font-size:13px;line-height:1.75;">{{ selected_content }}</textarea>
+      <div id="charWarn"
+           style="font-size:11px;color:#ef4444;margin-top:4px;display:none;">
+        ⚠️ LinkedIn の投稿は3,000文字以内にしてください。
+      </div>
+    </div>
+
+    <div class="row-actions" style="margin-top:8px;">
+      <button type="submit" id="submitBtn" class="btn btn-primary"
+              style="background:#0077B5;padding:10px 28px;font-size:14px;">
+        📤 LinkedIn に投稿して投稿済みにする
+      </button>
+      <a href="/articles" class="btn btn-ghost">キャンセル</a>
+    </div>
+  </form>
+
+  <!-- サイドバー -->
+  <div>
+    <div class="card" style="border-left:4px solid #22c55e;">
+      <div style="font-size:13px;font-weight:700;color:#15803d;margin-bottom:10px;">
+        ⚡ ボタンを押すと…
+      </div>
+      <div style="font-size:12px;color:#475569;line-height:2;">
+        1️⃣ Make の Webhook が呼ばれる<br>
+        2️⃣ Make が LinkedIn に自動投稿<br>
+        3️⃣ この記事が「✅ 投稿済み」に更新される
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:0;">
+      <div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:8px;">
+        💡 LinkedIn 投稿のコツ
+      </div>
+      <div style="font-size:12px;color:#475569;line-height:1.9;">
+        📌 500〜700文字が読まれやすい<br>
+        📌 3行目までで読者を引きつける<br>
+        📌 最後に問いかけで反応を促す<br>
+        📌 平日 8〜10時・12〜13時が効果的
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:0;background:#f8fafc;">
+      <div style="font-size:12px;color:#64748b;line-height:1.8;">
+        ⚙️ 連携: <strong>Make</strong> → <strong>LinkedIn</strong><br>
+        Make のシナリオが ON になっていることを確認してから送信してください。
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ta = document.getElementById('contentArea');
+const counter = document.getElementById('charCount');
+const warn = document.getElementById('charWarn');
+const btn = document.getElementById('submitBtn');
+
+function updateCount() {
+  if (!ta) return;
+  const n = ta.value.length;
+  counter.textContent = n.toLocaleString();
+  counter.style.color = n > 3000 ? '#ef4444' : n > 2500 ? '#f59e0b' : '#22c55e';
+  if (warn) warn.style.display = n > 3000 ? 'block' : 'none';
+  if (btn) btn.disabled = n > 3000;
+}
+
+if (ta) { ta.addEventListener('input', updateCount); updateCount(); }
+
+// 二重送信防止
+const form = document.querySelector('form[method="post"]');
+if (form) {
+  form.addEventListener('submit', () => {
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ 送信中...'; }
+  });
+}
+</script>
+{% endblock %}

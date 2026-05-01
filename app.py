@@ -151,40 +151,23 @@ def workflow():
     return render_template("workflow.html")
 
 
-# ── Buffer API ────────────────────────────────────────────────────────────────
+# ── Make Webhook → LinkedIn ───────────────────────────────────────────────────
 
-def _buffer_get_profiles(token: str) -> list:
-    """Buffer に接続されたプロファイル一覧を取得"""
-    r = httpx.get(
-        "https://api.bufferapp.com/1/profiles.json",
-        params={"access_token": token},
-        timeout=10,
-    )
-    r.raise_for_status()
-    return r.json()
-
-
-def _buffer_create_post(token: str, profile_id: str, text: str, scheduled_at=None) -> dict:
-    """Buffer に投稿を作成（scheduled_at は UTC Unix タイムスタンプ）"""
-    data = {"access_token": token, "profile_ids[]": profile_id, "text": text}
-    if scheduled_at:
-        data["scheduled_at"] = str(int(scheduled_at))
-    else:
-        data["now"] = "1"
+def _make_post_to_linkedin(webhook_url: str, content: str, title: str = "") -> None:
+    """Make の Custom Webhook 経由で LinkedIn に投稿する"""
     r = httpx.post(
-        "https://api.bufferapp.com/1/updates/create.json",
-        data=data,
+        webhook_url,
+        json={"content": content, "title": title},
         timeout=15,
     )
     r.raise_for_status()
-    return r.json()
 
 
-@app.route("/articles/<int:aid>/send-to-buffer", methods=["GET", "POST"])
+@app.route("/articles/<int:aid>/post-to-linkedin", methods=["GET", "POST"])
 @login_required
-def articles_send_to_buffer(aid):
-    """Buffer 経由で LinkedIn に投稿する確認・送信画面"""
-    token = os.environ.get("BUFFER_ACCESS_TOKEN", "")
+def articles_post_to_linkedin(aid):
+    """Make 経由で LinkedIn に投稿する確認・送信画面"""
+    webhook_url = os.environ.get("MAKE_WEBHOOK_URL", "")
 
     conn = get_conn()
     article = conn.execute("SELECT * FROM articles WHERE id=?", (aid,)).fetchone()
@@ -192,36 +175,18 @@ def articles_send_to_buffer(aid):
     if not article:
         return redirect(url_for("articles_list"))
 
-    # ── POST: Buffer に送信 ──────────────────────────────────────────────────
+    # ── POST: Make Webhook に送信 ────────────────────────────────────────────
     if request.method == "POST":
-        content      = request.form.get("content", "").strip()
-        dt_str       = request.form.get("scheduled_datetime", "")
-        profile_id   = request.form.get("profile_id", "")
-
-        scheduled_at = None
-        if dt_str:
-            try:
-                dt_naive     = datetime.strptime(dt_str, "%Y-%m-%dT%H:%M")
-                dt_jst       = dt_naive.replace(tzinfo=JST)
-                scheduled_at = int(dt_jst.timestamp())
-            except ValueError:
-                pass
+        content = request.form.get("content", "").strip()
+        title   = article["title"] or ""
 
         try:
-            result = _buffer_create_post(token, profile_id, content, scheduled_at)
-            if not result.get("success"):
-                raise ValueError(result.get("message", "Buffer API エラー"))
+            _make_post_to_linkedin(webhook_url, content, title)
         except Exception as e:
-            profiles = []
-            try:
-                profiles = [p for p in _buffer_get_profiles(token)
-                            if p.get("service") == "linkedin"]
-            except Exception:
-                pass
             return render_template(
-                "buffer_send.html",
-                article=article, profiles=profiles,
-                default_dt=dt_str, selected_content=content,
+                "linkedin_post.html",
+                article=article,
+                selected_content=content,
                 error=f"送信エラー: {e}",
             )
 
@@ -237,34 +202,22 @@ def articles_send_to_buffer(aid):
 
     # ── GET: 確認フォーム表示 ────────────────────────────────────────────────
     error = None
-    profiles = []
-
-    if not token:
-        error = "BUFFER_ACCESS_TOKEN が設定されていません。Railway の環境変数に追加してください。"
-    else:
-        try:
-            all_profiles = _buffer_get_profiles(token)
-            profiles = [p for p in all_profiles if p.get("service") == "linkedin"]
-            if not profiles:
-                error = "Buffer に LinkedIn アカウントが接続されていません。Buffer の設定で LinkedIn を追加してください。"
-        except httpx.HTTPStatusError as e:
-            error = f"Buffer API 認証エラー ({e.response.status_code}): アクセストークンを確認してください。"
-        except Exception as e:
-            error = f"Buffer API 接続エラー: {e}"
-
-    # デフォルト日時: scheduled_date の 9:00 JST
-    default_dt = ""
-    if article["scheduled_date"]:
-        default_dt = f"{article['scheduled_date']}T09:00"
-    elif not default_dt:
-        default_dt = datetime.now(JST).strftime("%Y-%m-%dT09:00")
+    if not webhook_url:
+        error = "MAKE_WEBHOOK_URL が設定されていません。Railway の環境変数に追加してください。"
 
     return render_template(
-        "buffer_send.html",
-        article=article, profiles=profiles,
-        default_dt=default_dt, selected_content=article["content"] or "",
+        "linkedin_post.html",
+        article=article,
+        selected_content=article["content"] or "",
         error=error,
     )
+
+
+# 旧 Buffer URL との後方互換（リダイレクト）
+@app.route("/articles/<int:aid>/send-to-buffer")
+@login_required
+def articles_send_to_buffer(aid):
+    return redirect(url_for("articles_post_to_linkedin", aid=aid))
 
 
 # ── 核心主張 (Beliefs) ────────────────────────────────────────────────────────
