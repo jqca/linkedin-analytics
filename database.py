@@ -1,49 +1,129 @@
-import sqlite3
 import os
+import sqlite3
 
+DATABASE_URL = os.environ.get("DATABASE_URL")
 DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "linkedin.db"))
 
 
-def get_conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+# ── PostgreSQL 互換レイヤー ────────────────────────────────────────────────────
 
+def _adapt_sql(sql: str) -> str:
+    """SQLite 用 SQL を PostgreSQL 用に変換"""
+    return (sql
+            .replace("?", "%s")
+            .replace("datetime('now')", "NOW()")
+            .replace("CURRENT_TIMESTAMP", "NOW()"))
+
+
+class _PGCursor:
+    """psycopg2 カーソルを sqlite3 カーソル互換にラップ"""
+    def __init__(self, cur):
+        self._c = cur
+
+    def fetchall(self):
+        return self._c.fetchall()   # RealDictRow → dict-like
+
+    def fetchone(self):
+        return self._c.fetchone()   # RealDictRow or None
+
+    @property
+    def rowcount(self):
+        return self._c.rowcount
+
+
+class _PGConn:
+    """psycopg2 connection を sqlite3 Connection 互換にラップ"""
+    def __init__(self, conn):
+        self._conn = conn
+
+    def execute(self, sql: str, params=()):
+        import psycopg2.extras
+        cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(_adapt_sql(sql), params)
+        return _PGCursor(cur)
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
+
+
+def _is_pg(conn) -> bool:
+    return isinstance(conn, _PGConn)
+
+
+def get_conn():
+    """DB 接続を返す。DATABASE_URL があれば PostgreSQL、なければ SQLite。"""
+    if DATABASE_URL:
+        import psycopg2
+        url = DATABASE_URL
+        # Railway は postgres:// を使う場合がある
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql://", 1)
+        return _PGConn(psycopg2.connect(url))
+    else:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+
+# ── DB 初期化 ─────────────────────────────────────────────────────────────────
 
 def init_db():
     conn = get_conn()
-    cur = conn.cursor()
+    pg = _is_pg(conn)
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS beliefs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            content TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
+    if pg:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS beliefs (
+                id      SERIAL PRIMARY KEY,
+                title   TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS articles (
+                id             SERIAL PRIMARY KEY,
+                title          TEXT DEFAULT '',
+                content        TEXT NOT NULL DEFAULT '',
+                status         TEXT DEFAULT 'draft',
+                scheduled_date TEXT DEFAULT '',
+                created_at     TIMESTAMP DEFAULT NOW(),
+                updated_at     TIMESTAMP DEFAULT NOW()
+            )
+        """)
+    else:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS beliefs (
+                id      INTEGER PRIMARY KEY AUTOINCREMENT,
+                title   TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS articles (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                title          TEXT DEFAULT '',
+                content        TEXT NOT NULL DEFAULT '',
+                status         TEXT DEFAULT 'draft',
+                scheduled_date TEXT DEFAULT '',
+                created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS articles (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT DEFAULT '',
-            content TEXT NOT NULL DEFAULT '',
-            status TEXT DEFAULT 'draft',
-            scheduled_date TEXT DEFAULT '',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    cur.execute("SELECT COUNT(*) as c FROM beliefs")
-    if cur.fetchone()["c"] == 0:
-        _seed(cur)
+    row = conn.execute("SELECT COUNT(*) AS c FROM beliefs").fetchone()
+    if row["c"] == 0:
+        _seed(conn)
 
     conn.commit()
     conn.close()
 
 
-# ── シードデータ ─────────────────────────────────────────────────────────────
+# ── シードデータ ──────────────────────────────────────────────────────────────
 
 _BELIEF_1 = """\
 量子業界の人はほとんど数年先の未来しか語らない。今目の前の課題を量子技術でどうするかについて語れない。
@@ -62,7 +142,7 @@ AIを高度化するものが量子コンピュータであることを軸とし
 _BELIEF_3 = """\
 「量子でAIの学習を高速化できる」——これは研究者の言葉であり、事業化の言葉ではない。
 
-量子業界で「AIを高度化するのが量子コンピュータとわかっている」という人も、\
+量子業界で「AIを高度化するのが量子コンピュータとわかっている」という人も、
 よく話してみると研究者目線でしか語れていない。
 
 事業家が問うべきは「目の前の課題を大規模化できる想像力があるか」だ。
@@ -169,23 +249,24 @@ _ARTICLE_3 = """\
 あなたの目の前の課題、大規模化したら何になりますか？"""
 
 
-def _seed(cur):
-    beliefs = [
+def _seed(conn):
+    for title, content in [
         ("量子業界は「今」を語れない", _BELIEF_1),
         ("AIを高度化するのが量子コンピュータ", _BELIEF_2),
         ("研究者目線 vs 事業家目線", _BELIEF_3),
-    ]
-    for title, content in beliefs:
-        cur.execute("INSERT INTO beliefs (title, content) VALUES (?, ?)", (title, content))
+    ]:
+        conn.execute(
+            "INSERT INTO beliefs (title, content) VALUES (?, ?)",
+            (title, content)
+        )
 
-    articles = [
+    for title, content, status, date in [
         ("第2弾：AIを高度化するのが量子コンピュータ、という考え方",
          _ARTICLE_2, "scheduled", "2026-05-07"),
         ("第3弾：研究者目線 vs 事業家目線",
          _ARTICLE_3, "scheduled", "2026-05-09"),
-    ]
-    for title, content, status, date in articles:
-        cur.execute(
+    ]:
+        conn.execute(
             "INSERT INTO articles (title, content, status, scheduled_date) VALUES (?, ?, ?, ?)",
             (title, content, status, date)
         )
