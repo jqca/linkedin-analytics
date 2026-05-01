@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ログイン — LinkedIn Analytics</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic', sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #003d5c 0%, #005885 40%, #0077B5 70%, #00a0dc 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .login-wrap {
+      width: 100%;
+      max-width: 400px;
+    }
+
+    /* Logo area */
+    .logo {
+      text-align: center;
+      margin-bottom: 32px;
+      color: #fff;
+    }
+    .logo-icon {
+      width: 56px;
+      height: 56px;
+      background: #fff;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 14px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.25);
+    }
+    .logo-icon svg { width: 36px; height: 36px; }
+    .logo-title { font-size: 20px; font-weight: 700; letter-spacing: .5px; }
+    .logo-sub { font-size: 13px; opacity: .75; margin-top: 4px; }
+
+    /* Card */
+    .card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 36px 32px;
+      box-shadow: 0 16px 48px rgba(0,0,0,.2);
+    }
+    .card-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+    .card-desc {
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 28px;
+      line-height: 1.5;
+    }
+
+    /* Form */
+    .form-group { margin-bottom: 20px; }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 6px;
+    }
+    input[type="password"] {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 15px;
+      color: #1e293b;
+      background: #f8fafc;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+      font-family: inherit;
+    }
+    input[type="password"]:focus {
+      border-color: #0077B5;
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(0,119,181,.12);
+    }
+
+    /* Error */
+    .error {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #dc2626;
+      margin-bottom: 20px;
+    }
+    .error::before { content: "⚠️"; font-size: 14px; }
+
+    /* Button */
+    button[type="submit"] {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, #0077B5, #005885);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: .3px;
+      font-family: inherit;
+      transition: opacity .2s, transform .1s;
+    }
+    button[type="submit"]:hover { opacity: .92; }
+    button[type="submit"]:active { transform: scale(.98); }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 12px;
+      color: rgba(255,255,255,.55);
+    }
+  </style>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="logo">
+      <div class="logo-icon">
+        <!-- LinkedIn "in" icon -->
+        <svg viewBox="0 0 24 24" fill="#0077B5" xmlns="http://www.w3.org/2000/svg">
+          <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+        </svg>
+      </div>
+      <div class="logo-title">LinkedIn Analytics</div>
+      <div class="logo-sub">高野 秀隆 — フォロワー分析レポート</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">ログイン</div>
+      <div class="card-desc">このレポートは限定公開です。パスワードを入力してください。</div>
+
+      {% if error %}
+      <div class="error">{{ error }}</div>
+      {% endif %}
+
+      <form method="post" action="/login">
+        <div class="form-group">
+          <label for="password">パスワード</label>
+          <input type="password" id="password" name="password" placeholder="パスワードを入力" autofocus autocomplete="current-password">
+        </div>
+        <button type="submit">ログイン →</button>
+      </form>
+    </div>
+
+    <div class="footer">&copy; 2026 株式会社ZebraQuantum — 閲覧権限者のみ</div>
+  </div>
+</body>
+</html>

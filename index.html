@@ -28,7 +28,14 @@
       background: linear-gradient(135deg, #005885 0%, #0077B5 60%, #00a0dc 100%);
       color: #fff; padding: 40px 32px 48px;
     }
-    .header-inner { max-width: 1100px; margin: 0 auto; }
+    .header-inner { max-width: 1100px; margin: 0 auto; position: relative; }
+    .logout-btn {
+      position: absolute; top: 0; right: 0;
+      color: rgba(255,255,255,.8); font-size: 13px; text-decoration: none;
+      background: rgba(255,255,255,.15); padding: 6px 16px; border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.25); transition: background .2s;
+    }
+    .logout-btn:hover { background: rgba(255,255,255,.28); color: #fff; }
     .header-logo { font-size: 13px; opacity: .7; margin-bottom: 16px; letter-spacing: 1px; text-transform: uppercase; }
     .header-name { font-size: 28px; font-weight: 700; margin-bottom: 6px; }
     .header-title { font-size: 14px; opacity: .8; line-height: 1.6; margin-bottom: 24px; }
@@ -114,6 +121,7 @@
 <!-- Header -->
 <header>
   <div class="header-inner">
+    <a href="/logout" class="logout-btn">ログアウト</a>
     <div class="header-logo">LinkedIn Analytics Report</div>
     <div class="header-name">高野 秀隆</div>
     <div class="header-title">
