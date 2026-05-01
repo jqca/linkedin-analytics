@@ -1,0 +1,175 @@
+{% extends "base_app.html" %}
+{% block title %}{{ pinfo.label }} バリアント — LinkedIn Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title">
+    <span>{{ pinfo.icon }}</span>
+    {{ pinfo.label }} — {% if variant %}編集{% else %}作成{% endif %}
+  </div>
+  <a href="/articles?tab={{ platform }}" class="btn btn-ghost">← 一覧に戻る</a>
+</div>
+
+<!-- 元記事ヘッダー -->
+<div style="background:#f0f9ff;border-radius:8px;padding:10px 16px;margin-bottom:20px;
+            font-size:13px;color:#334155;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+  <span>元記事:</span>
+  <strong>{{ article.title if article.title else '（タイトルなし）' }}</strong>
+  {% if article.scheduled_date %}
+  <span style="color:#0077B5;font-weight:700;">{{ article.scheduled_date }}</span>
+  {% endif %}
+  <span style="color:#94a3b8;">{{ article.content | length }}文字</span>
+  <a href="/articles/{{ article.id }}/edit"
+     style="color:#0077B5;text-decoration:none;font-size:12px;margin-left:auto;">✏️ 元記事を編集</a>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 320px;gap:24px;align-items:start;">
+
+  <!-- ═══ メインフォーム ═══ -->
+  <div>
+    <form method="post">
+
+      <div class="form-group">
+        <label>タイトル</label>
+        <input type="text" name="title"
+               value="{{ variant.title if variant and variant.title else article.title }}"
+               placeholder="記事タイトルを入力...">
+      </div>
+
+      <div class="form-group">
+        <label>
+          本文
+          <span style="float:right;font-size:12px;color:#94a3b8;">
+            <span id="varCharCount">0</span> 文字
+          </span>
+        </label>
+        <textarea name="content" id="varContent" rows="22"
+                  style="font-size:13px;line-height:1.75;"
+                  placeholder="{{ pinfo.tip }}">{{ variant.content if variant else article.content }}</textarea>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 180px;gap:16px;">
+        <div class="form-group">
+          <label>公開URL（公開後に入力）</label>
+          <input type="url" name="url"
+                 value="{{ variant.url if variant else '' }}"
+                 placeholder="https://note.com/...">
+        </div>
+        <div class="form-group">
+          <label>ステータス</label>
+          <select name="status"
+                  style="width:100%;padding:10px 12px;border-radius:8px;
+                         border:1.5px solid #e2e8f0;font-size:14px;
+                         color:#334155;background:#fff;">
+            <option value="draft"
+              {% if not variant or variant.status == 'draft' %}selected{% endif %}>✏️ 下書き</option>
+            <option value="published"
+              {% if variant and variant.status == 'published' %}selected{% endif %}>✅ 公開済み</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row-actions" style="margin-top:8px;">
+        <button type="submit" class="btn btn-primary">💾 保存</button>
+        <a href="/articles?tab={{ platform }}" class="btn btn-ghost">キャンセル</a>
+      </div>
+    </form>
+
+    {% if variant %}
+    <div style="margin-top:20px;padding-top:16px;border-top:1px dashed #e2e8f0;">
+      <form method="post"
+            action="/articles/{{ article.id }}/variants/{{ platform }}/delete"
+            onsubmit="return confirm('このバリアントを削除しますか？')">
+        <button type="submit" class="btn btn-danger btn-sm">🗑️ このバリアントを削除</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ═══ サイドバー ═══ -->
+  <div>
+
+    <!-- プラットフォームのコツ -->
+    <div class="card" style="margin-bottom:16px;border-left:4px solid #0077B5;">
+      <div style="font-size:13px;font-weight:700;color:#0077B5;margin-bottom:8px;">
+        {{ pinfo.icon }} {{ pinfo.label }} のコツ
+      </div>
+      <div style="font-size:12px;color:#475569;line-height:1.8;">{{ pinfo.tip }}</div>
+      {% if platform == 'note' %}
+      <div style="font-size:11px;color:#94a3b8;margin-top:10px;line-height:1.6;">
+        💡 目安: 2,000〜3,000文字<br>
+        💡 見出し（# / ##）で構造化<br>
+        💡 公開後にURLを記録してステータスを「公開済み」に
+      </div>
+      {% elif platform == 'x' %}
+      <div style="font-size:11px;color:#94a3b8;margin-top:10px;line-height:1.6;">
+        💡 各ツイート: 140文字以内<br>
+        💡 ツイート間は空行で区切る<br>
+        💡 最後のツイートにLinkedIn記事のURLを追加
+      </div>
+      {% elif platform == 'newsletter' %}
+      <div style="font-size:11px;color:#94a3b8;margin-top:10px;line-height:1.6;">
+        💡 件名はLinkedIn記事タイトルを流用可<br>
+        💡 冒頭挨拶＋本文＋次回予告の3部構成<br>
+        💡 読者に「返信してください」と問いかけると効果的
+      </div>
+      {% elif platform == 'slide' %}
+      <div style="font-size:11px;color:#94a3b8;margin-top:10px;line-height:1.6;">
+        💡 1枚目: タイトルスライド<br>
+        💡 ━━━ ごとに1スライド（3〜5枚が理想）<br>
+        💡 最終スライド: 問いかけ＋URL
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- LinkedIn 元記事 -->
+    <div class="card">
+      <div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:8px;">
+        📋 LinkedIn 元記事
+      </div>
+      <div style="font-size:12px;color:#475569;line-height:1.75;white-space:pre-wrap;
+                  max-height:360px;overflow-y:auto;background:#f8fafc;padding:10px;
+                  border-radius:6px;">{{ article.content }}</div>
+      <!-- 元記事テキスト（JS用） -->
+      <textarea id="origContent" style="display:none">{{ article.content }}</textarea>
+      <button type="button" onclick="copyOriginal(this)"
+              class="btn btn-ghost btn-sm" style="margin-top:10px;width:100%;">
+        📋 元記事をコピー
+      </button>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── 文字数カウンター ────────────────────────────────────────
+const ta      = document.getElementById('varContent');
+const counter = document.getElementById('varCharCount');
+const platform = '{{ platform }}';
+
+function updateCount() {
+  const n = ta.value.length;
+  counter.textContent = n.toLocaleString();
+  if (platform === 'note') {
+    counter.style.color = n < 800 ? '#94a3b8' : n < 3000 ? '#22c55e' : '#f59e0b';
+  } else if (platform === 'x') {
+    counter.style.color = n > 560 ? '#ef4444' : '#22c55e'; // 4ツイート分目安
+  } else {
+    counter.style.color = n > 200 ? '#22c55e' : '#94a3b8';
+  }
+}
+ta.addEventListener('input', updateCount);
+updateCount();
+
+// ── 元記事コピー ─────────────────────────────────────────────
+function copyOriginal(btn) {
+  const content = document.getElementById('origContent').value;
+  navigator.clipboard.writeText(content).then(() => {
+    btn.textContent = '✅ コピーしました';
+    setTimeout(() => { btn.textContent = '📋 元記事をコピー'; }, 2000);
+  });
+}
+</script>
+{% endblock %}

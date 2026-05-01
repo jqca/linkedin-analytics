@@ -53,6 +53,40 @@ def _is_pg(conn) -> bool:
     return isinstance(conn, _PGConn)
 
 
+def _migrate(conn, pg):
+    """article_variants テーブルを追加（冪等）"""
+    if pg:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS article_variants (
+                id         SERIAL PRIMARY KEY,
+                article_id INTEGER NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+                platform   TEXT NOT NULL,
+                title      TEXT DEFAULT '',
+                content    TEXT NOT NULL DEFAULT '',
+                url        TEXT DEFAULT '',
+                status     TEXT DEFAULT 'draft',
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(article_id, platform)
+            )
+        """)
+    else:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS article_variants (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                article_id INTEGER NOT NULL,
+                platform   TEXT NOT NULL,
+                title      TEXT DEFAULT '',
+                content    TEXT NOT NULL DEFAULT '',
+                url        TEXT DEFAULT '',
+                status     TEXT DEFAULT 'draft',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(article_id, platform)
+            )
+        """)
+
+
 def get_conn():
     """DB 接続を返す。DATABASE_URL があれば PostgreSQL、なければ SQLite。"""
     if DATABASE_URL:
@@ -114,6 +148,8 @@ def init_db():
                 updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+
+    _migrate(conn, pg)
 
     row = conn.execute("SELECT COUNT(*) AS c FROM beliefs").fetchone()
     if row["c"] == 0:

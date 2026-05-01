@@ -12,6 +12,31 @@ APP_PASSWORD = os.environ.get("APP_PASSWORD", "linkedin2026")
 
 init_db()
 
+# ── プラットフォーム定義 ───────────────────────────────────────────────────────
+PLATFORMS = {
+    'note': {
+        'icon': '📝', 'label': 'note',
+        'tip': 'LinkedIn版（約500文字）をベースに2,000〜3,000文字へ拡張。'
+               '見出し（#）・具体例・まとめを追加するとSEOに強くなります。',
+    },
+    'x': {
+        'icon': '🐦', 'label': 'Xスレッド',
+        'tip': '━━━ ごとに1ツイートに分割。各140文字以内。'
+               '最初のツイートでフック、最後にLinkedIn記事へのリンクを入れましょう。',
+    },
+    'newsletter': {
+        'icon': '📰', 'label': 'ニュースレター',
+        'tip': '冒頭に今週テーマの挨拶、末尾に次回予告を追加。'
+               '対話感のある文体で書くと開封率が上がります。',
+    },
+    'slide': {
+        'icon': '📊', 'label': 'スライド',
+        'tip': 'タイトル＋各━━━セクションを1スライドに変換。'
+               'Canva/Google Slidesで作成後にURLを記録しましょう。',
+    },
+}
+PLATFORM_KEYS = list(PLATFORMS.keys())
+
 
 # ── テンプレートフィルター ────────────────────────────────────────────────────
 @app.template_filter("firstlines")
@@ -128,7 +153,15 @@ def beliefs_delete(bid):
 def articles_list():
     tab = request.args.get("tab", "schedule")
     conn = get_conn()
-    if tab == "posted":
+
+    if tab in PLATFORM_KEYS:
+        # プラットフォームタブ: 全記事を投稿済み→予定→下書き順で表示
+        articles = conn.execute(
+            "SELECT * FROM articles ORDER BY "
+            "CASE status WHEN 'posted' THEN 0 WHEN 'scheduled' THEN 1 ELSE 2 END, "
+            "scheduled_date DESC, created_at DESC"
+        ).fetchall()
+    elif tab == "posted":
         articles = conn.execute(
             "SELECT * FROM articles WHERE status='posted' ORDER BY scheduled_date DESC"
         ).fetchall()
@@ -141,8 +174,20 @@ def articles_list():
             "SELECT * FROM articles WHERE status != 'posted' "
             "ORDER BY CASE WHEN scheduled_date='' THEN 1 ELSE 0 END, scheduled_date ASC"
         ).fetchall()
+
+    # 各記事のバリアントマップ構築 {article_id: {platform: row}}
+    variants_map = {}
+    for a in articles:
+        rows = conn.execute(
+            "SELECT * FROM article_variants WHERE article_id=?",
+            (a['id'],)
+        ).fetchall()
+        variants_map[a['id']] = {row['platform']: row for row in rows}
+
     conn.close()
-    return render_template("articles.html", articles=articles, tab=tab)
+    return render_template("articles.html", articles=articles, tab=tab,
+                           variants_map=variants_map,
+                           platforms=PLATFORMS, platform_keys=PLATFORM_KEYS)
 
 
 @app.route("/articles/new", methods=["GET", "POST"])
@@ -214,6 +259,64 @@ def articles_mark_posted(aid):
     conn.commit()
     conn.close()
     return redirect(url_for("articles_list"))
+
+
+# ── バリアント管理 (Article Variants) ────────────────────────────────────────
+
+@app.route("/articles/<int:aid>/variants/<platform>", methods=["GET", "POST"])
+@login_required
+def variant_form(aid, platform):
+    if platform not in PLATFORM_KEYS:
+        return redirect(url_for("articles_list", tab="note"))
+    conn = get_conn()
+    article = conn.execute("SELECT * FROM articles WHERE id=?", (aid,)).fetchone()
+    if not article:
+        conn.close()
+        return redirect(url_for("articles_list"))
+    variant = conn.execute(
+        "SELECT * FROM article_variants WHERE article_id=? AND platform=?",
+        (aid, platform)
+    ).fetchone()
+
+    if request.method == "POST":
+        title   = request.form.get("title", "").strip()
+        content = request.form.get("content", "").strip()
+        url     = request.form.get("url", "").strip()
+        status  = request.form.get("status", "draft")
+        if variant:
+            conn.execute(
+                "UPDATE article_variants SET title=?, content=?, url=?, status=?, "
+                "updated_at=datetime('now') WHERE id=?",
+                (title, content, url, status, variant['id'])
+            )
+        else:
+            conn.execute(
+                "INSERT INTO article_variants "
+                "(article_id, platform, title, content, url, status) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (aid, platform, title, content, url, status)
+            )
+        conn.commit()
+        conn.close()
+        return redirect(url_for("articles_list", tab=platform))
+
+    conn.close()
+    return render_template("article_variant_form.html",
+                           article=article, variant=variant,
+                           platform=platform, pinfo=PLATFORMS[platform])
+
+
+@app.route("/articles/<int:aid>/variants/<platform>/delete", methods=["POST"])
+@login_required
+def variant_delete(aid, platform):
+    conn = get_conn()
+    conn.execute(
+        "DELETE FROM article_variants WHERE article_id=? AND platform=?",
+        (aid, platform)
+    )
+    conn.commit()
+    conn.close()
+    return redirect(url_for("articles_list", tab=platform))
 
 
 if __name__ == "__main__":

@@ -7,18 +7,103 @@
   <a href="/articles/new" class="btn btn-primary">＋ 新規記事</a>
 </div>
 
-<!-- Tabs -->
+<!-- タブ1行目: 投稿ステータス -->
 <div class="tabs">
   <a href="/articles?tab=schedule" {% if tab == 'schedule' %}class="active"{% endif %}>📅 スケジュール</a>
   <a href="/articles?tab=all"      {% if tab == 'all' %}class="active"{% endif %}>📋 すべて</a>
   <a href="/articles?tab=posted"   {% if tab == 'posted' %}class="active"{% endif %}>✅ 投稿済み</a>
 </div>
 
+<!-- タブ2行目: 転用プラットフォーム -->
+<div style="background:#f8fafc;border:1px solid #e2e8f0;border-top:none;
+            border-radius:0 0 8px 8px;padding:7px 16px;display:flex;
+            align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:24px;">
+  <span style="font-size:11px;color:#94a3b8;font-weight:600;white-space:nowrap;margin-right:2px;">転用管理:</span>
+  {% for pk, pinfo in platforms.items() %}
+  <a href="/articles?tab={{ pk }}"
+     style="font-size:12px;padding:3px 12px;border-radius:12px;text-decoration:none;font-weight:600;
+            {% if tab == pk %}background:#0077B5;color:#fff;{% else %}background:#e2e8f0;color:#475569;{% endif %}">
+    {{ pinfo.icon }} {{ pinfo.label }}
+  </a>
+  {% endfor %}
+</div>
+
+
+{% if tab in platform_keys %}
+{# ═══════════════ プラットフォームタブ ═══════════════ #}
+
+<div style="background:#f0f9ff;border-left:4px solid #0077B5;border-radius:0 8px 8px 0;
+            padding:12px 16px;margin-bottom:20px;">
+  <div style="font-size:14px;font-weight:700;color:#0077B5;margin-bottom:4px;">
+    {{ platforms[tab].icon }} {{ platforms[tab].label }} 転用管理
+  </div>
+  <div style="font-size:12px;color:#475569;line-height:1.65;">{{ platforms[tab].tip }}</div>
+</div>
+
+{% if articles %}
+  {% for a in articles %}
+  {% set v = variants_map.get(a.id, {}).get(tab) %}
+  <div class="card" style="padding:14px 16px;">
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+
+      <!-- 記事情報 -->
+      <div style="flex:1;min-width:180px;">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:5px;">
+          {% if a.status == 'posted' %}
+            <span class="badge badge-posted" style="font-size:10px;padding:2px 7px;">✅ 投稿済み</span>
+          {% elif a.status == 'scheduled' %}
+            <span class="badge badge-scheduled" style="font-size:10px;padding:2px 7px;">📅 予定</span>
+          {% else %}
+            <span class="badge badge-draft" style="font-size:10px;padding:2px 7px;">📝 下書き</span>
+          {% endif %}
+          {% if a.scheduled_date %}
+          <span style="font-size:11px;color:#64748b;">{{ a.scheduled_date }}</span>
+          {% endif %}
+        </div>
+        <div style="font-size:14px;font-weight:600;color:#0f172a;">
+          {{ a.title if a.title else '（タイトルなし）' }}
+        </div>
+      </div>
+
+      <!-- バリアントステータス＋アクション -->
+      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+        {% if v %}
+          {% if v.status == 'published' %}
+            <span style="background:#dcfce7;color:#166534;padding:3px 12px;
+                         border-radius:12px;font-size:12px;font-weight:600;">✅ 公開済み</span>
+            {% if v.url %}
+            <a href="{{ v.url }}" target="_blank"
+               style="font-size:12px;color:#0077B5;text-decoration:none;">↗ 表示</a>
+            {% endif %}
+          {% else %}
+            <span style="background:#fef3c7;color:#92400e;padding:3px 12px;
+                         border-radius:12px;font-size:12px;font-weight:600;">✏️ 下書き</span>
+          {% endif %}
+          <a href="/articles/{{ a.id }}/variants/{{ tab }}" class="btn btn-ghost btn-sm">編集</a>
+        {% else %}
+          <span style="color:#94a3b8;font-size:12px;">ー 未作成</span>
+          <a href="/articles/{{ a.id }}/variants/{{ tab }}" class="btn btn-primary btn-sm">＋ 作成</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="card empty">
+    <div class="empty-icon">{{ platforms[tab].icon }}</div>
+    <div class="empty-text">記事がありません。</div>
+  </div>
+{% endif %}
+
+
+{% else %}
+{# ═══════════════ 通常タブ（スケジュール / すべて / 投稿済み） ═══════════════ #}
+
 {% if articles %}
   {% for a in articles %}
   <div class="card" style="position:relative;">
 
-    <!-- Status badge + Date -->
+    <!-- ステータスバッジ + 日付 -->
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
       {% if a.status == 'posted' %}
         <span class="badge badge-posted">✅ 投稿済み</span>
@@ -31,26 +116,27 @@
       {% if a.scheduled_date %}
         <span style="font-size:13px;font-weight:700;color:#0077B5;">
           {{ a.scheduled_date }}
-          {% if a.scheduled_date == '2026-05-07' %}（水）{% elif a.scheduled_date == '2026-05-09' %}（金）{% endif %}
+          {% if a.scheduled_date == '2026-05-07' %}（水）
+          {% elif a.scheduled_date == '2026-05-09' %}（金）
+          {% elif a.scheduled_date == '2026-05-12' %}（月）
+          {% endif %}
         </span>
       {% endif %}
 
-      <span class="char-count" style="margin-left:auto;">
-        {{ a.content | length }} 文字
-      </span>
+      <span class="char-count" style="margin-left:auto;">{{ a.content | length }} 文字</span>
     </div>
 
-    <!-- Title -->
+    <!-- タイトル -->
     <div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:8px;">
       {{ a.title if a.title else '（タイトルなし）' }}
     </div>
 
-    <!-- Preview (first 3 lines) -->
+    <!-- プレビュー（冒頭3行） -->
     <div style="font-size:13px;color:#475569;line-height:1.7;white-space:pre-wrap;
                 background:#f8fafc;border-radius:8px;padding:12px;margin-bottom:14px;
                 border-left:3px solid #e2e8f0;">{{ a.content | firstlines(3) }}</div>
 
-    <!-- Actions -->
+    <!-- アクション -->
     <div class="row-actions">
       <a href="/articles/{{ a.id }}/edit" class="btn btn-ghost btn-sm">✏️ 編集</a>
 
@@ -69,6 +155,35 @@
         作成: {{ a.created_at | datefmt }}
       </span>
     </div>
+
+    <!-- 転用状況バッジ -->
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid #f1f5f9;
+                display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+      <span style="font-size:11px;color:#94a3b8;font-weight:600;margin-right:2px;">転用:</span>
+      {% set vmap = variants_map.get(a.id, {}) %}
+      {% for pk, pinfo in platforms.items() %}
+        {% set v = vmap.get(pk) %}
+        {% if v %}
+          <a href="/articles/{{ a.id }}/variants/{{ pk }}"
+             title="{{ pinfo.label }}: {% if v.status == 'published' %}公開済み{% else %}下書き{% endif %}"
+             style="display:inline-flex;align-items:center;gap:2px;font-size:11px;padding:2px 9px;
+                    border-radius:10px;text-decoration:none;font-weight:600;
+                    {% if v.status == 'published' %}background:#dcfce7;color:#166534;
+                    {% else %}background:#fef3c7;color:#92400e;{% endif %}">
+            {{ pinfo.icon }}{% if v.status == 'published' %} ✅{% else %} ✏️{% endif %}
+          </a>
+        {% else %}
+          <a href="/articles/{{ a.id }}/variants/{{ pk }}"
+             title="{{ pinfo.label }}を作成"
+             style="display:inline-flex;align-items:center;gap:2px;font-size:11px;padding:2px 9px;
+                    border-radius:10px;text-decoration:none;background:#f1f5f9;color:#94a3b8;
+                    border:1px dashed #cbd5e1;">
+            {{ pinfo.icon }} ＋
+          </a>
+        {% endif %}
+      {% endfor %}
+    </div>
+
   </div>
   {% endfor %}
 
@@ -85,5 +200,7 @@
       {% endif %}
     </div>
   </div>
+{% endif %}
+
 {% endif %}
 {% endblock %}
