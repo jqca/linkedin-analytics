@@ -264,6 +264,165 @@ def articles_post_to_zenn(aid):
     )
 
 
+# ── YouTube 字幕取得 & 要約 ───────────────────────────────────────────────────
+
+_YT_SUMMARY_PROMPT = """\
+以下はYouTube動画の字幕テキストです。内容を日本語で詳しく要約してください。
+
+【動画タイトル】
+{title}
+
+【字幕テキスト】
+{transcript}
+
+以下の形式で要約してください：
+
+## 動画の概要
+（この動画のテーマと主な結論を200文字程度で）
+
+## 主要なポイント
+（重要な主張・データ・事例を箇条書きで5〜8点）
+
+## キーワード・概念
+（登場した重要な用語・フレームワークを箇条書きで）
+
+## LinkedIn投稿アイデア
+（この動画の内容をもとに、量子コンピュータ×AI×事業化の観点から、LinkedIn投稿のネタを2〜3個提案）
+
+日本語で回答してください。"""
+
+_yt_jobs: dict = {}
+_yt_jobs_lock = threading.Lock()
+
+
+def _extract_video_id(url: str):
+    """YouTube URL から動画 ID を抽出"""
+    patterns = [
+        r'youtube\.com/watch\?v=([^&\s]+)',
+        r'youtu\.be/([^?\s]+)',
+        r'youtube\.com/embed/([^?\s]+)',
+        r'youtube\.com/shorts/([^?\s]+)',
+    ]
+    for p in patterns:
+        m = re.search(p, url)
+        if m:
+            return m.group(1)
+    return None
+
+
+def _run_yt_summary(job_id: str, video_id: str) -> None:
+    """バックグラウンドで YouTube 字幕を取得し Claude で要約する"""
+    try:
+        from youtube_transcript_api import (
+            YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
+        )
+
+        # 字幕取得（日本語 → 英語 → 全言語の順で試みる）
+        transcript_list = None
+        try:
+            transcript_list = YouTubeTranscriptApi.get_transcript(
+                video_id, languages=['ja', 'ja-JP'])
+        except (NoTranscriptFound, Exception):
+            try:
+                transcript_list = YouTubeTranscriptApi.get_transcript(
+                    video_id, languages=['en'])
+            except (NoTranscriptFound, Exception):
+                try:
+                    all_transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
+                    for t in all_transcripts:
+                        transcript_list = t.fetch()
+                        break
+                except Exception:
+                    pass
+
+        if not transcript_list:
+            raise Exception("この動画には字幕がありません。字幕がある動画をお試しください。")
+
+        # 字幕テキストを結合（最大12,000文字）
+        full_text = ' '.join([t['text'] for t in transcript_list])
+        excerpt = full_text[:12000]
+
+        # Claude で要約
+        import anthropic
+        client = anthropic.Anthropic(
+            api_key=os.environ.get("ANTHROPIC_API_KEY"),
+            timeout=100.0,
+        )
+        prompt = (_YT_SUMMARY_PROMPT
+                  .replace("{title}", "（YouTube動画）")
+                  .replace("{transcript}", excerpt))
+        message = client.messages.create(
+            model="claude-sonnet-4-5",
+            max_tokens=3000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        with _yt_jobs_lock:
+            _yt_jobs[job_id] = {
+                "status": "done",
+                "summary": message.content[0].text,
+                "chars": len(full_text),
+            }
+    except Exception as e:
+        with _yt_jobs_lock:
+            _yt_jobs[job_id] = {"status": "error", "error": f"{type(e).__name__}: {e}"}
+
+
+@app.route("/youtube-summary", methods=["GET"])
+@login_required
+def youtube_summary():
+    return render_template("youtube_summary.html")
+
+
+@app.route("/youtube-summary/start", methods=["POST"])
+@login_required
+def youtube_summary_start():
+    data = request.get_json(silent=True) or {}
+    url = data.get("url", "").strip()
+    video_id = _extract_video_id(url)
+    if not video_id:
+        return jsonify({"error": "YouTube の URL を正しく入力してください"}), 400
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return jsonify({"error": "ANTHROPIC_API_KEY が設定されていません"}), 500
+
+    job_id = str(uuid.uuid4())
+    with _yt_jobs_lock:
+        _yt_jobs[job_id] = {"status": "running"}
+
+    threading.Thread(
+        target=_run_yt_summary,
+        args=(job_id, video_id),
+        daemon=True,
+    ).start()
+    return jsonify({"job_id": job_id})
+
+
+@app.route("/youtube-summary/status/<job_id>")
+@login_required
+def youtube_summary_status(job_id):
+    with _yt_jobs_lock:
+        job = dict(_yt_jobs.get(job_id, {"status": "not_found"}))
+    if job["status"] in ("done", "error"):
+        with _yt_jobs_lock:
+            _yt_jobs.pop(job_id, None)
+    return jsonify(job)
+
+
+@app.route("/youtube-summary/create-article", methods=["POST"])
+@login_required
+def youtube_summary_create_article():
+    """YouTube 要約から LinkedIn 記事ドラフトを作成"""
+    title = request.form.get("title", "").strip()
+    content = request.form.get("content", "").strip()
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO articles (title, content, status) VALUES (?, ?, 'draft')",
+        (title, content)
+    )
+    conn.commit()
+    conn.close()
+    return redirect(url_for("articles_list", tab="all"))
+
+
 # ── テンプレートフィルター ────────────────────────────────────────────────────
 @app.template_filter("firstlines")
 def first_lines_filter(s, n=3):

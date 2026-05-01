@@ -1,0 +1,306 @@
+{% extends "base_app.html" %}
+{% block title %}YouTube要約 — LinkedIn Analytics{% endblock %}
+
+{% block head %}
+<style>
+  .yt-input-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 28px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.06);
+    border: 1px solid #e2e8f0;
+    margin-bottom: 24px;
+  }
+  .yt-url-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .yt-url-row input {
+    flex: 1;
+    font-size: 14px;
+  }
+  .yt-result {
+    display: none;
+  }
+  .yt-loading {
+    display: none;
+    text-align: center;
+    padding: 48px 20px;
+  }
+  .yt-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid #e2e8f0;
+    border-top-color: #ff0000;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .yt-summary-box {
+    background: #f8fafc;
+    border-radius: 10px;
+    padding: 20px 24px;
+    font-size: 13px;
+    color: #334155;
+    line-height: 1.85;
+    white-space: pre-wrap;
+    border: 1px solid #e2e8f0;
+    max-height: 600px;
+    overflow-y: auto;
+  }
+  .yt-summary-box h2 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 16px 0 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .yt-summary-box h2:first-child { margin-top: 0; }
+  .yt-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .tip-note {
+    font-size: 11px;
+    color: #94a3b8;
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 10px 14px;
+    line-height: 1.7;
+    margin-top: 12px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title"><span>▶️</span> YouTube 動画要約</div>
+</div>
+
+<!-- 入力フォーム -->
+<div class="yt-input-card">
+  <div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:12px;">
+    🔗 YouTube URL を入力して要約を生成
+  </div>
+  <div class="yt-url-row">
+    <input type="url" id="ytUrl"
+           placeholder="https://www.youtube.com/watch?v=..."
+           style="background:#fff;">
+    <button class="btn btn-primary" id="startBtn" onclick="startSummary()"
+            style="background:#ff0000;white-space:nowrap;padding:10px 20px;">
+      ▶ 要約する
+    </button>
+  </div>
+  <div class="tip-note">
+    💡 字幕（自動生成含む）がある動画であれば要約できます。<br>
+    ※ 字幕のない動画や非公開動画は要約できません。
+  </div>
+</div>
+
+<!-- ローディング -->
+<div class="yt-loading card" id="loadingArea">
+  <div class="yt-spinner"></div>
+  <div style="font-size:14px;font-weight:700;color:#334155;margin-bottom:6px;">
+    字幕を取得して要約中...
+  </div>
+  <div id="loadingStatus" style="font-size:12px;color:#94a3b8;">少々お待ちください</div>
+</div>
+
+<!-- 要約結果 -->
+<div class="yt-result" id="resultArea">
+  <div class="card" style="border-left:4px solid #ff0000;">
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:14px;font-weight:700;color:#0f172a;">📋 要約結果</div>
+      <div id="charInfo" style="font-size:11px;color:#94a3b8;"></div>
+    </div>
+    <div class="yt-summary-box" id="summaryBox"></div>
+
+    <div class="yt-actions">
+      <button class="btn btn-ghost" onclick="copySummary(this)">
+        📋 要約をコピー
+      </button>
+      <button class="btn btn-primary" onclick="showArticleForm()"
+              style="background:#0077B5;">
+        ✍️ LinkedIn記事のドラフトを作成
+      </button>
+      <button class="btn btn-ghost" onclick="reset()"
+              style="margin-left:auto;">
+        🔄 別の動画を要約
+      </button>
+    </div>
+  </div>
+
+  <!-- 記事ドラフト作成フォーム -->
+  <div id="articleFormArea" style="display:none;">
+    <div class="card" style="border-left:4px solid #0077B5;margin-top:0;">
+      <div style="font-size:13px;font-weight:700;color:#0077B5;margin-bottom:12px;">
+        ✍️ LinkedIn 記事ドラフトを作成
+      </div>
+      <form method="post" action="/youtube-summary/create-article">
+        <div class="form-group">
+          <label>記事タイトル</label>
+          <input type="text" name="title" id="draftTitle"
+                 placeholder="動画を参考にしたタイトルを入力...">
+        </div>
+        <div class="form-group">
+          <label>
+            本文（編集可）
+            <span style="float:right;font-size:12px;color:#94a3b8;">
+              <span id="draftCount">0</span> 文字
+            </span>
+          </label>
+          <textarea name="content" id="draftContent" rows="12"
+                    style="font-size:13px;line-height:1.75;"></textarea>
+        </div>
+        <div class="row-actions">
+          <button type="submit" class="btn btn-primary">💾 下書きとして保存</button>
+          <button type="button" class="btn btn-ghost"
+                  onclick="document.getElementById('articleFormArea').style.display='none'">
+            キャンセル
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- エラー表示 -->
+<div id="errorArea" style="display:none;">
+  <div class="card" style="border-left:4px solid #ef4444;background:#fef2f2;">
+    <div style="font-size:14px;font-weight:700;color:#dc2626;margin-bottom:6px;">⚠️ エラー</div>
+    <div id="errorMsg" style="font-size:13px;color:#7f1d1d;line-height:1.7;"></div>
+    <button class="btn btn-ghost btn-sm" onclick="reset()" style="margin-top:12px;">
+      🔄 もう一度試す
+    </button>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentSummary = '';
+
+async function startSummary() {
+  const url = document.getElementById('ytUrl').value.trim();
+  if (!url) {
+    alert('YouTube の URL を入力してください');
+    return;
+  }
+
+  // UI 切替
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('loadingArea').style.display = 'block';
+  document.getElementById('resultArea').style.display = 'none';
+  document.getElementById('errorArea').style.display = 'none';
+  document.getElementById('articleFormArea').style.display = 'none';
+
+  try {
+    // 1. ジョブ開始
+    const startRes = await fetch('/youtube-summary/start', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const startData = await startRes.json();
+    if (startData.error) throw new Error(startData.error);
+
+    const { job_id } = startData;
+
+    // 2. ポーリング（3秒ごと・最大120秒）
+    let elapsed = 0;
+    while (elapsed < 120) {
+      await new Promise(r => setTimeout(r, 3000));
+      elapsed += 3;
+      document.getElementById('loadingStatus').textContent =
+        `字幕取得・要約中... ${elapsed}秒経過`;
+
+      const pollRes = await fetch(`/youtube-summary/status/${job_id}`, {
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json' },
+      });
+      const job = await pollRes.json();
+
+      if (job.status === 'done') {
+        showResult(job);
+        return;
+      }
+      if (job.status === 'error') throw new Error(job.error);
+      if (job.status === 'not_found') throw new Error('ジョブが見つかりません（再試行してください）');
+    }
+    throw new Error('タイムアウト: もう一度お試しください');
+
+  } catch (e) {
+    document.getElementById('loadingArea').style.display = 'none';
+    document.getElementById('errorArea').style.display = 'block';
+    document.getElementById('errorMsg').textContent = e.message;
+    document.getElementById('startBtn').disabled = false;
+  }
+}
+
+function showResult(job) {
+  currentSummary = job.summary;
+  document.getElementById('loadingArea').style.display = 'none';
+  document.getElementById('resultArea').style.display = 'block';
+  document.getElementById('startBtn').disabled = false;
+
+  // Markdown の ## を <h2> に変換して表示
+  const html = job.summary
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^- (.+)$/gm, '• $1');
+  document.getElementById('summaryBox').innerHTML = html;
+
+  if (job.chars) {
+    document.getElementById('charInfo').textContent =
+      `字幕 ${job.chars.toLocaleString()} 文字を分析`;
+  }
+}
+
+function copySummary(btn) {
+  navigator.clipboard.writeText(currentSummary).then(() => {
+    btn.textContent = '✅ コピーしました';
+    setTimeout(() => { btn.textContent = '📋 要約をコピー'; }, 2000);
+  });
+}
+
+function showArticleForm() {
+  document.getElementById('articleFormArea').style.display = 'block';
+  // 要約の「LinkedIn投稿アイデア」セクションだけ抜き出して本文に入れる
+  const ideaMatch = currentSummary.match(/## LinkedIn投稿アイデア\n([\s\S]+?)(?=\n##|$)/);
+  const draftContent = document.getElementById('draftContent');
+  draftContent.value = ideaMatch
+    ? `【参考：YouTube動画より】\n\n${ideaMatch[1].trim()}`
+    : currentSummary.slice(0, 500);
+  updateDraftCount();
+  document.getElementById('articleFormArea').scrollIntoView({ behavior: 'smooth' });
+}
+
+function updateDraftCount() {
+  const n = document.getElementById('draftContent').value.length;
+  document.getElementById('draftCount').textContent = n.toLocaleString();
+}
+document.getElementById('draftContent')?.addEventListener('input', updateDraftCount);
+
+function reset() {
+  document.getElementById('loadingArea').style.display = 'none';
+  document.getElementById('resultArea').style.display = 'none';
+  document.getElementById('errorArea').style.display = 'none';
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('ytUrl').value = '';
+  document.getElementById('ytUrl').focus();
+}
+
+// Enter キーで送信
+document.getElementById('ytUrl').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startSummary();
+});
+</script>
+{% endblock %}
