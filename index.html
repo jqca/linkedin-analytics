@@ -138,6 +138,53 @@
 
     /* Divider */
     .section-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin: 28px 0 14px; }
+
+    /* Book progress card */
+    .book-card {
+      background: linear-gradient(135deg, #fef9f0 0%, #fffbf5 100%);
+      border: 1px solid #fde68a;
+      border-radius: 16px; padding: 28px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.06);
+    }
+    .book-card-title {
+      font-size: 16px; font-weight: 700; color: #92400e;
+      margin-bottom: 20px; display: flex; align-items: center; gap: 8px;
+    }
+    .book-progress-wrap {
+      display: grid; grid-template-columns: 1fr 320px; gap: 32px; align-items: start;
+    }
+    @media (max-width: 760px) { .book-progress-wrap { grid-template-columns: 1fr; } }
+    .book-big-num {
+      font-size: 60px; font-weight: 800; color: var(--amber); line-height: 1;
+      display: flex; align-items: baseline; gap: 8px;
+    }
+    .book-big-num .denom { font-size: 22px; font-weight: 700; color: #b45309; }
+    .book-pct-label { font-size: 14px; color: #92400e; margin: 6px 0 14px; font-weight: 600; }
+    .book-bar-track {
+      height: 14px; background: #fde68a; border-radius: 999px; overflow: hidden; margin-bottom: 10px;
+    }
+    .book-bar-fill {
+      height: 100%; border-radius: 999px;
+      background: linear-gradient(90deg, #d97706, #f59e0b);
+      transition: width 1.2s ease;
+    }
+    .book-sub { font-size: 12px; color: #92400e; line-height: 1.8; }
+    .book-stats-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    }
+    .book-stat-item {
+      background: #fff; border-radius: 12px; padding: 14px 16px;
+      border: 1px solid #fde68a; text-align: center;
+    }
+    .book-stat-val { font-size: 28px; font-weight: 800; color: var(--amber); line-height: 1; }
+    .book-stat-label { font-size: 11px; color: #92400e; margin-top: 4px; font-weight: 600; }
+    .book-est-date {
+      grid-column: 1 / -1; background: #92400e; color: #fff;
+      border-radius: 12px; padding: 14px 16px; text-align: center;
+    }
+    .book-est-date .date-val { font-size: 22px; font-weight: 800; }
+    .book-est-date .date-label { font-size: 11px; opacity: .8; margin-top: 2px; }
   </style>
 </head>
 <body>
@@ -211,6 +258,48 @@
         <div class="insight-body">IT・コンサルが全体の34%超。AI・量子コンピュータの専門知識への需要が高い層が中心。</div>
         <div class="insight-head">IT×コンサル層が主役</div>
       </div>
+    </div>
+  </div>
+
+  <!-- Book Progress -->
+  <div class="section-label">📚 書籍化プロジェクト進捗</div>
+  <div class="book-card" id="bookProgressCard">
+    <div class="book-card-title">📖 LinkedIn投稿 → 書籍化 目標トラッカー</div>
+    <div class="book-progress-wrap">
+
+      <!-- Left: progress bar -->
+      <div>
+        <div class="book-big-num">
+          <span id="bp-posted">—</span>
+          <span class="denom">/ 100 投稿</span>
+        </div>
+        <div class="book-pct-label" id="bp-pct-label">読み込み中...</div>
+        <div class="book-bar-track">
+          <div class="book-bar-fill" id="bp-bar" style="width:0%"></div>
+        </div>
+        <div class="book-sub">
+          🎯 目標: <strong>100投稿</strong>で書籍1冊分のコンテンツ完成<br>
+          📅 ペース: 週2投稿ペースで進行中<br>
+          <span id="bp-remaining-text">—</span>
+        </div>
+      </div>
+
+      <!-- Right: stat boxes -->
+      <div class="book-stats-grid">
+        <div class="book-stat-item">
+          <div class="book-stat-val" id="bp-scheduled">—</div>
+          <div class="book-stat-label">📅 投稿予定</div>
+        </div>
+        <div class="book-stat-item">
+          <div class="book-stat-val" id="bp-draft">—</div>
+          <div class="book-stat-label">📝 下書き</div>
+        </div>
+        <div class="book-est-date">
+          <div class="date-val" id="bp-est-date">—</div>
+          <div class="date-label">🏁 完成予想時期（週2ペース）</div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -413,6 +502,28 @@
 </footer>
 
 <script>
+// Book progress fetch
+(async function() {
+  try {
+    const res = await fetch('/api/stats');
+    if (!res.ok) return;
+    const d = await res.json();
+    document.getElementById('bp-posted').textContent = d.posted;
+    document.getElementById('bp-scheduled').textContent = d.scheduled;
+    document.getElementById('bp-draft').textContent = d.draft;
+    document.getElementById('bp-pct-label').textContent =
+      `達成率 ${d.pct}%（残り${d.remaining}投稿）`;
+    document.getElementById('bp-bar').style.width = Math.min(d.pct, 100) + '%';
+    document.getElementById('bp-remaining-text').innerHTML =
+      `✏️ あと <strong>${d.remaining}投稿</strong> で目標達成！`;
+    const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+    document.getElementById('bp-est-date').textContent =
+      `${d.est_year}年 ${monthNames[d.est_month - 1]}`;
+  } catch(e) {
+    // silently skip if not logged in
+  }
+})();
+
 // Seniority Donut Chart
 const senCtx = document.getElementById('seniorityChart').getContext('2d');
 new Chart(senCtx, {

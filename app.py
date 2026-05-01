@@ -603,6 +603,42 @@ def workflow():
     return render_template("workflow.html")
 
 
+@app.route("/api/stats")
+@login_required
+def api_stats():
+    """ダッシュボード用の統計情報を返す"""
+    TARGET = 100
+    PACE_PER_WEEK = 2
+    conn = get_conn()
+    posted = conn.execute(
+        "SELECT COUNT(*) FROM articles WHERE status='posted'"
+    ).fetchone()[0]
+    scheduled = conn.execute(
+        "SELECT COUNT(*) FROM articles WHERE status='scheduled'"
+    ).fetchone()[0]
+    draft = conn.execute(
+        "SELECT COUNT(*) FROM articles WHERE status='draft'"
+    ).fetchone()[0]
+    conn.close()
+
+    remaining = max(TARGET - posted, 0)
+    weeks_needed = remaining / PACE_PER_WEEK if PACE_PER_WEEK > 0 else 0
+
+    from datetime import date, timedelta
+    est_date = date.today() + timedelta(weeks=weeks_needed)
+
+    return jsonify({
+        "posted": posted,
+        "scheduled": scheduled,
+        "draft": draft,
+        "target": TARGET,
+        "remaining": remaining,
+        "pct": round(posted / TARGET * 100, 1),
+        "est_year": est_date.year,
+        "est_month": est_date.month,
+    })
+
+
 # ── Make Webhook → LinkedIn ───────────────────────────────────────────────────
 
 def _make_post_to_linkedin(webhook_url: str, content: str, title: str = "") -> None:
