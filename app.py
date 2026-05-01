@@ -3,7 +3,13 @@ from flask import (Flask, send_from_directory, session, redirect,
 from functools import wraps
 from datetime import datetime
 import os
+import threading
+import uuid
 from database import init_db, get_conn
+
+# ── バックグラウンドジョブストア ──────────────────────────────────────────────
+_expand_jobs: dict = {}          # {job_id: {"status": ..., "content": ..., "error": ...}}
+_expand_jobs_lock = threading.Lock()
 
 app = Flask(__name__, static_folder=".", template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
@@ -61,6 +67,28 @@ _NOTE_PROMPT = """\
 
 note記事（## 見出しを使った2,000文字以上の完全版）:"""
 
+
+def _run_expansion(job_id: str, art_content: str, art_title: str) -> None:
+    """バックグラウンドスレッドで記事を生成し _expand_jobs に結果を書き込む"""
+    try:
+        import anthropic
+        client = anthropic.Anthropic(
+            api_key=os.environ.get("ANTHROPIC_API_KEY"),
+            timeout=100.0,
+        )
+        prompt = (_NOTE_PROMPT
+                  .replace("{title}", art_title)
+                  .replace("{content}", art_content))
+        message = client.messages.create(
+            model="claude-sonnet-4-5",
+            max_tokens=4000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        with _expand_jobs_lock:
+            _expand_jobs[job_id] = {"status": "done", "content": message.content[0].text}
+    except Exception as e:
+        with _expand_jobs_lock:
+            _expand_jobs[job_id] = {"status": "error", "error": f"{type(e).__name__}: {e}"}
 
 
 # ── テンプレートフィルター ────────────────────────────────────────────────────
@@ -331,48 +359,44 @@ def variant_form(aid, platform):
                            platform=platform, pinfo=PLATFORMS[platform])
 
 
-@app.route("/articles/<int:aid>/variants/<platform>/expand-content")
+@app.route("/articles/<int:aid>/variants/<platform>/expand-content/start", methods=["POST"])
 @login_required
-def variant_expand_content(aid, platform):
-    """AI で LinkedIn 記事を一括拡張して JSON で返す"""
-    import traceback
-    try:
-        if platform not in PLATFORM_KEYS:
-            return jsonify({"error": "invalid platform"}), 400
-        if not os.environ.get("ANTHROPIC_API_KEY"):
-            return jsonify({"error": "ANTHROPIC_API_KEY が設定されていません"}), 500
-        if platform != "note":
-            return jsonify({"error": "このプラットフォームはAI拡張未対応です"}), 400
+def variant_expand_start(aid, platform):
+    """AI拡張ジョブをバックグラウンドで開始し job_id を即時返す"""
+    if platform != "note":
+        return jsonify({"error": "このプラットフォームはAI拡張未対応です"}), 400
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return jsonify({"error": "ANTHROPIC_API_KEY が設定されていません"}), 500
 
-        conn = get_conn()
-        article = conn.execute("SELECT * FROM articles WHERE id=?", (aid,)).fetchone()
-        conn.close()
-        if not article:
-            return jsonify({"error": "article not found"}), 404
+    conn = get_conn()
+    article = conn.execute("SELECT * FROM articles WHERE id=?", (aid,)).fetchone()
+    conn.close()
+    if not article:
+        return jsonify({"error": "article not found"}), 404
 
-        art_content = article["content"] or ""
-        art_title   = article["title"] or "（タイトルなし）"
+    job_id = str(uuid.uuid4())
+    with _expand_jobs_lock:
+        _expand_jobs[job_id] = {"status": "running"}
 
-        # .format() はユーザー入力の {} で KeyError になるため replace で代替
-        prompt = (_NOTE_PROMPT
-                  .replace("{title}", art_title)
-                  .replace("{content}", art_content))
+    thread = threading.Thread(
+        target=_run_expansion,
+        args=(job_id, article["content"] or "", article["title"] or "（タイトルなし）"),
+        daemon=True,
+    )
+    thread.start()
+    return jsonify({"job_id": job_id})
 
-        import anthropic
-        client = anthropic.Anthropic(
-            api_key=os.environ.get("ANTHROPIC_API_KEY"),
-            timeout=90.0,
-        )
-        message = client.messages.create(
-            model="claude-sonnet-4-5",
-            max_tokens=4000,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return jsonify({"content": message.content[0].text})
 
-    except Exception as e:
-        detail = traceback.format_exc()[-600:]
-        return jsonify({"error": f"{type(e).__name__}: {e}", "detail": detail}), 500
+@app.route("/articles/<int:aid>/variants/<platform>/expand-content/status/<job_id>")
+@login_required
+def variant_expand_status(aid, platform, job_id):
+    """ジョブのステータス・結果を返す"""
+    with _expand_jobs_lock:
+        job = dict(_expand_jobs.get(job_id, {"status": "not_found"}))
+    if job["status"] in ("done", "error"):
+        with _expand_jobs_lock:
+            _expand_jobs.pop(job_id, None)
+    return jsonify(job)
 
 
 @app.route("/articles/<int:aid>/variants/<platform>/delete", methods=["POST"])

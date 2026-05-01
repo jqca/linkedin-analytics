@@ -182,33 +182,53 @@ function copyOriginal(btn) {
   });
 }
 
-// ── AI拡張（一括生成）────────────────────────────────────────
+// ── AI拡張（バックグラウンド＋ポーリング）────────────────────
 async function expandWithAI(btn) {
   const status = document.getElementById('expandStatus');
   btn.disabled = true;
-  btn.textContent = '⏳ AIが執筆中... (30〜60秒)';
-  if (status) { status.style.display = 'block'; status.textContent = 'Claude が記事を生成しています。完了まで少々お待ちください...'; }
-  ta.value = '';
-  updateCount();
+  btn.textContent = '⏳ AIが執筆中...';
+  if (status) { status.style.display = 'block'; status.textContent = '記事を生成しています...'; }
+  ta.value = ''; updateCount();
+
+  const base = `/articles/{{ article.id }}/variants/{{ platform }}/expand-content`;
 
   try {
-    const res = await fetch(
-      `/articles/{{ article.id }}/variants/{{ platform }}/expand-content`,
-      { credentials: 'same-origin', headers: { 'Accept': 'application/json' } }
-    );
-    const ct = res.headers.get('content-type') || '';
-    if (!ct.includes('application/json')) {
-      const text = await res.text();
-      throw new Error(`サーバーエラー (${res.status}): ${text.replace(/<[^>]+>/g,'').trim().slice(0,200)}`);
+    // 1. ジョブ開始（すぐ返る）
+    const startRes = await fetch(`${base}/start`, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!startRes.ok) {
+      const t = await startRes.text();
+      throw new Error(`起動エラー ${startRes.status}: ${t.replace(/<[^>]+>/g,'').trim().slice(0,200)}`);
     }
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
+    const { job_id, error: startErr } = await startRes.json();
+    if (startErr) throw new Error(startErr);
 
-    ta.value = data.content;
-    updateCount();
-    btn.textContent = '✅ 拡張完了 — 内容を確認して保存してください';
-    btn.style.background = '#22c55e';
-    if (status) status.textContent = `${data.content.length.toLocaleString()} 文字のnote記事が生成されました。`;
+    // 2. ポーリング（3秒ごと、最大120秒）
+    let elapsed = 0;
+    while (elapsed < 120) {
+      await new Promise(r => setTimeout(r, 3000));
+      elapsed += 3;
+      if (status) status.textContent = `生成中... ${elapsed}秒経過`;
+
+      const pollRes = await fetch(`${base}/status/${job_id}`, {
+        credentials: 'same-origin', headers: { 'Accept': 'application/json' }
+      });
+      const job = await pollRes.json();
+
+      if (job.status === 'done') {
+        ta.value = job.content; updateCount();
+        btn.textContent = '✅ 拡張完了 — 内容を確認して保存してください';
+        btn.style.background = '#22c55e';
+        if (status) status.textContent = `${job.content.length.toLocaleString()} 文字のnote記事が生成されました。`;
+        return;
+      }
+      if (job.status === 'error') throw new Error(job.error || '生成エラー');
+      if (job.status === 'not_found') throw new Error('ジョブが見つかりません（サーバー再起動の可能性）');
+    }
+    throw new Error('タイムアウト: 再試行してください');
+
   } catch (e) {
     btn.textContent = '❌ エラー — 再試行してください';
     btn.disabled = false;
