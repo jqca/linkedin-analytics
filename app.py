@@ -70,7 +70,7 @@ def _stream_note_expansion(content: str, title: str = ""):
     prompt = _NOTE_PROMPT.format(title=title or "（タイトルなし）", content=content)
     with client.messages.stream(
         model="claude-sonnet-4-5",
-        max_tokens=3000,
+        max_tokens=6000,
         messages=[{"role": "user", "content": prompt}],
     ) as stream:
         for text in stream.text_stream:
