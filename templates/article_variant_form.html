@@ -182,29 +182,45 @@ function copyOriginal(btn) {
   });
 }
 
-// ── AI拡張 ────────────────────────────────────────────────────
+// ── AI拡張（ストリーミング）────────────────────────────────────
 async function expandWithAI(btn) {
   const status = document.getElementById('expandStatus');
   btn.disabled = true;
-  btn.textContent = '⏳ AIが執筆中... (20〜30秒)';
-  if (status) { status.style.display = 'block'; status.textContent = 'Claude がnote向けに2,000文字以上に書き起こしています...'; }
+  btn.textContent = '⏳ AIが執筆中...';
+  if (status) { status.style.display = 'block'; status.textContent = 'Claude がリアルタイムで書き起こし中...'; }
+  ta.value = '';
+  updateCount();
 
   try {
     const res = await fetch(`/articles/{{ article.id }}/variants/{{ platform }}/expand-content`);
-    const data = await res.json();
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(`サーバーエラー ${res.status}: ${txt.slice(0,120)}`);
+    }
 
-    if (data.content) {
-      ta.value = data.content;
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let text = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+      ta.value = text;
       updateCount();
+    }
+
+    if (text.includes('【生成エラー:')) {
+      btn.textContent = '❌ 生成エラー — 再試行してください';
+      btn.disabled = false;
+      if (status) status.textContent = text.match(/【生成エラー:(.+?)】/)?.[1] || '';
+    } else {
       btn.textContent = '✅ 拡張完了 — 内容を確認して保存してください';
       btn.style.background = '#22c55e';
-      if (status) status.textContent = `${data.content.length.toLocaleString()}文字のnote記事が生成されました。`;
-    } else {
-      btn.textContent = '❌ エラー: ' + (data.error || '不明');
-      btn.disabled = false;
+      if (status) status.textContent = `${text.length.toLocaleString()} 文字のnote記事が生成されました。`;
     }
   } catch (e) {
-    btn.textContent = '❌ 通信エラー';
+    btn.textContent = '❌ エラー';
     btn.disabled = false;
     if (status) status.textContent = e.message;
   }

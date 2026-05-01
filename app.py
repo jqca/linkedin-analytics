@@ -1,5 +1,6 @@
 from flask import (Flask, send_from_directory, session, redirect,
-                   url_for, request, render_template, jsonify)
+                   url_for, request, render_template, jsonify,
+                   Response, stream_with_context)
 from functools import wraps
 from datetime import datetime
 import os
@@ -62,17 +63,18 @@ _NOTE_PROMPT = """\
 note記事（## 見出しを使った2,000文字以上の完全版）:"""
 
 
-def _expand_for_note(content: str, title: str = "") -> str:
-    """LinkedIn記事をnote用に2,000文字以上へAI拡張する"""
+def _stream_note_expansion(content: str, title: str = ""):
+    """LinkedIn記事をnote用にストリーミング拡張するジェネレーター"""
     import anthropic
     client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
     prompt = _NOTE_PROMPT.format(title=title or "（タイトルなし）", content=content)
-    message = client.messages.create(
+    with client.messages.stream(
         model="claude-sonnet-4-5",
         max_tokens=3000,
         messages=[{"role": "user", "content": prompt}],
-    )
-    return message.content[0].text
+    ) as stream:
+        for text in stream.text_stream:
+            yield text
 
 
 # ── テンプレートフィルター ────────────────────────────────────────────────────
@@ -346,24 +348,32 @@ def variant_form(aid, platform):
 @app.route("/articles/<int:aid>/variants/<platform>/expand-content")
 @login_required
 def variant_expand_content(aid, platform):
-    """AI で LinkedIn 記事をプラットフォーム用に拡張して JSON で返す"""
+    """AI で LinkedIn 記事をストリーミング拡張して text/plain で返す"""
     if platform not in PLATFORM_KEYS:
         return jsonify({"error": "invalid platform"}), 400
     if not os.environ.get("ANTHROPIC_API_KEY"):
         return jsonify({"error": "ANTHROPIC_API_KEY が設定されていません"}), 500
+    if platform != "note":
+        return jsonify({"error": "このプラットフォームはAI拡張未対応です"}), 400
     conn = get_conn()
     article = conn.execute("SELECT * FROM articles WHERE id=?", (aid,)).fetchone()
     conn.close()
     if not article:
         return jsonify({"error": "article not found"}), 404
-    try:
-        if platform == "note":
-            expanded = _expand_for_note(article["content"], article["title"])
-        else:
-            return jsonify({"error": "このプラットフォームはAI拡張未対応です"}), 400
-        return jsonify({"content": expanded})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+
+    art_content = article["content"]
+    art_title   = article["title"] or "（タイトルなし）"
+
+    def generate():
+        try:
+            yield from _stream_note_expansion(art_content, art_title)
+        except Exception as e:
+            yield f"\n\n【生成エラー: {e}】"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/plain; charset=utf-8"
+    )
 
 
 @app.route("/articles/<int:aid>/variants/<platform>/delete", methods=["POST"])
