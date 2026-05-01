@@ -372,7 +372,11 @@ def variant_expand_content(aid, platform):
 
     return Response(
         stream_with_context(generate()),
-        mimetype="text/plain; charset=utf-8"
+        mimetype="text/plain; charset=utf-8",
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache, no-transform",
+        }
     )
 
 
