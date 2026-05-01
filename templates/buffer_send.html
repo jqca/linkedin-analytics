@@ -1,0 +1,189 @@
+{% extends "base_app.html" %}
+{% block title %}Buffer 送信 — LinkedIn Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title"><span>📤</span> Buffer 送信</div>
+  <a href="/articles" class="btn btn-ghost">← 記事一覧に戻る</a>
+</div>
+
+{% if article %}
+<!-- 元記事ヘッダー -->
+<div style="background:#f0f9ff;border-radius:8px;padding:10px 16px;margin-bottom:20px;
+            font-size:13px;color:#334155;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+  <span>記事:</span>
+  <strong>{{ article.title if article.title else '（タイトルなし）' }}</strong>
+  {% if article.scheduled_date %}
+  <span style="color:#0077B5;font-weight:700;">{{ article.scheduled_date }}</span>
+  {% endif %}
+  <span style="color:#94a3b8;">{{ article.content | length }}文字</span>
+</div>
+{% endif %}
+
+{% if error %}
+<!-- エラー表示 -->
+<div class="card" style="border-left:4px solid #ef4444;background:#fef2f2;">
+  <div style="font-size:14px;font-weight:700;color:#dc2626;margin-bottom:8px;">⚠️ エラー</div>
+  <div style="font-size:13px;color:#7f1d1d;line-height:1.7;">{{ error }}</div>
+
+  {% if 'BUFFER_ACCESS_TOKEN' in error %}
+  <div style="margin-top:16px;font-size:13px;color:#334155;line-height:1.8;">
+    <strong>設定手順：</strong><br>
+    1. <a href="https://buffer.com/developers/apps" target="_blank" rel="noopener"
+          style="color:#0077B5;">buffer.com/developers/apps</a> でアプリを作成<br>
+    2. OAuth でアクセストークンを取得<br>
+    3. Railway の「Variables」に <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">BUFFER_ACCESS_TOKEN</code> を追加<br>
+    4. デプロイ後にこのページを再度開く
+  </div>
+  {% elif 'LinkedIn' in error %}
+  <div style="margin-top:16px;font-size:13px;color:#334155;line-height:1.8;">
+    <strong>対処法：</strong><br>
+    <a href="https://buffer.com/manage/channels/connect" target="_blank" rel="noopener"
+       style="color:#0077B5;">Buffer の設定</a> から LinkedIn アカウントを接続してください。
+  </div>
+  {% endif %}
+</div>
+
+{% else %}
+<!-- 送信フォーム -->
+<div style="display:grid;grid-template-columns:1fr 300px;gap:24px;align-items:start;">
+
+  <form method="post">
+
+    <!-- プロファイル選択 -->
+    {% if profiles | length > 1 %}
+    <div class="form-group">
+      <label>投稿先 LinkedIn アカウント</label>
+      {% for p in profiles %}
+      <label style="display:flex;align-items:center;gap:10px;padding:10px;border:1.5px solid #e2e8f0;
+                    border-radius:8px;margin-bottom:8px;cursor:pointer;font-weight:400;
+                    text-transform:none;letter-spacing:0;">
+        <input type="radio" name="profile_id" value="{{ p.id }}"
+               {% if loop.first %}checked{% endif %}>
+        <span>
+          <strong style="font-size:13px;">{{ p.formatted_username or p.service_username }}</strong>
+          <span style="font-size:11px;color:#94a3b8;margin-left:6px;">{{ p.service_type or 'profile' }}</span>
+        </span>
+      </label>
+      {% endfor %}
+    </div>
+    {% else %}
+    <input type="hidden" name="profile_id" value="{{ profiles[0].id }}">
+    {% endif %}
+
+    <!-- 投稿本文 -->
+    <div class="form-group">
+      <label>
+        投稿本文
+        <span style="float:right;font-size:12px;color:#94a3b8;">
+          <span id="charCount">0</span> / 3,000 文字
+        </span>
+      </label>
+      <textarea name="content" id="contentArea" rows="18"
+                style="font-size:13px;line-height:1.75;"
+                placeholder="LinkedIn に投稿する本文を入力...">{{ selected_content }}</textarea>
+      <div id="charWarn" style="font-size:11px;color:#ef4444;margin-top:4px;display:none;">
+        ⚠️ LinkedIn の投稿は3,000文字以内にしてください。
+      </div>
+    </div>
+
+    <!-- 投稿日時 -->
+    <div class="form-group">
+      <label>投稿予定日時（JST）</label>
+      <input type="datetime-local" name="scheduled_datetime"
+             value="{{ default_dt }}"
+             style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;
+                    border-radius:8px;font-size:14px;background:#f8fafc;">
+      <div style="font-size:11px;color:#94a3b8;margin-top:4px;">
+        空欄にすると Buffer キューに追加されます（即時投稿ではありません）。
+      </div>
+    </div>
+
+    <div class="row-actions" style="margin-top:8px;">
+      <button type="submit" id="submitBtn" class="btn btn-primary"
+              style="background:#0369a1;padding:10px 24px;font-size:14px;">
+        📤 Buffer に送信して投稿済みにする
+      </button>
+      <a href="/articles" class="btn btn-ghost">キャンセル</a>
+    </div>
+  </form>
+
+  <!-- サイドバー -->
+  <div>
+    <div class="card" style="border-left:4px solid #0369a1;">
+      <div style="font-size:13px;font-weight:700;color:#0369a1;margin-bottom:10px;">
+        🔵 接続中の LinkedIn アカウント
+      </div>
+      {% for p in profiles %}
+      <div style="font-size:13px;color:#334155;padding:8px;background:#f0f9ff;
+                  border-radius:6px;margin-bottom:6px;">
+        <strong>{{ p.formatted_username or p.service_username }}</strong>
+        <span style="font-size:11px;color:#94a3b8;display:block;margin-top:2px;">
+          {{ p.service_type or 'profile' }}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="card" style="margin-top:0;">
+      <div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:8px;">
+        ⚡ 送信後の動作
+      </div>
+      <div style="font-size:12px;color:#475569;line-height:1.8;">
+        ✅ Buffer に予約投稿が追加される<br>
+        ✅ この記事のステータスが「投稿済み」に自動更新<br>
+        <span style="color:#94a3b8;">※ 実際の LinkedIn 投稿は Buffer が指定日時に行います</span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:0;">
+      <div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:8px;">
+        💡 LinkedIn 投稿のコツ
+      </div>
+      <div style="font-size:12px;color:#475569;line-height:1.8;">
+        📌 500〜700文字が読まれやすい<br>
+        📌 3行目までで読者を引きつける<br>
+        📌 最後に問いかけで反応を促す<br>
+        📌 平日 8〜10時、12〜13時が効果的
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ta = document.getElementById('contentArea');
+const counter = document.getElementById('charCount');
+const warn = document.getElementById('charWarn');
+const btn = document.getElementById('submitBtn');
+
+function updateCount() {
+  if (!ta) return;
+  const n = ta.value.length;
+  counter.textContent = n.toLocaleString();
+  counter.style.color = n > 3000 ? '#ef4444' : n > 2500 ? '#f59e0b' : '#22c55e';
+  if (warn) warn.style.display = n > 3000 ? 'block' : 'none';
+  if (btn) btn.disabled = n > 3000;
+}
+
+if (ta) {
+  ta.addEventListener('input', updateCount);
+  updateCount();
+}
+
+// 送信中の二重送信防止
+const form = document.querySelector('form[method="post"]');
+if (form) {
+  form.addEventListener('submit', () => {
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '⏳ 送信中...';
+    }
+  });
+}
+</script>
+{% endblock %}
