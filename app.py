@@ -124,6 +124,16 @@ def _run_expansion(job_id: str, art_content: str, art_title: str,
             _expand_jobs[job_id] = {"status": "error", "error": f"{type(e).__name__}: {e}"}
 
 
+# ── 認証デコレーター ──────────────────────────────────────────────────────────
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
+
+
 # ── GitHub API → Zenn 自動投稿 ────────────────────────────────────────────────
 import base64
 import re
@@ -269,16 +279,6 @@ def datefmt_filter(v):
     if hasattr(v, "strftime"):          # PostgreSQL: datetime オブジェクト
         return v.strftime("%Y-%m-%d")
     return str(v)[:10]                  # SQLite: 文字列
-
-
-# ── 認証デコレーター ──────────────────────────────────────────────────────────
-def login_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if not session.get("logged_in"):
-            return redirect(url_for("login"))
-        return f(*args, **kwargs)
-    return decorated
 
 
 # ── 認証 ─────────────────────────────────────────────────────────────────────
