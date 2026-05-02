@@ -54,7 +54,7 @@ def _is_pg(conn) -> bool:
 
 
 def _migrate(conn, pg):
-    """article_variants テーブルを追加（冪等）"""
+    """マイグレーション（冪等）: article_variants / followers テーブルを追加"""
     if pg:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS article_variants (
@@ -70,6 +70,14 @@ def _migrate(conn, pg):
                 UNIQUE(article_id, platform)
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS followers (
+                id          SERIAL PRIMARY KEY,
+                count       INTEGER NOT NULL,
+                recorded_at DATE NOT NULL UNIQUE,
+                source      TEXT DEFAULT 'scrape'
+            )
+        """)
     else:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS article_variants (
@@ -83,6 +91,14 @@ def _migrate(conn, pg):
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(article_id, platform)
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS followers (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                count       INTEGER NOT NULL,
+                recorded_at TEXT NOT NULL UNIQUE,
+                source      TEXT DEFAULT 'scrape'
             )
         """)
 
