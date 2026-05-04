@@ -150,6 +150,25 @@
                 background:#f8fafc;border-radius:8px;padding:12px;margin-bottom:14px;
                 border-left:3px solid #e2e8f0;">{{ a.content | firstlines(3) }}</div>
 
+    <!-- デモ動画プレーヤー -->
+    {% if a.video_url %}
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px;font-weight:700;color:#7c3aed;margin-bottom:6px;
+                  display:flex;align-items:center;gap:5px;">
+        🎬 デモ動画
+      </div>
+      <video controls preload="metadata"
+             style="width:100%;max-width:560px;border-radius:10px;
+                    border:1px solid #e2e8f0;background:#000;display:block;">
+        <source src="{{ a.video_url }}" type="video/mp4">
+      </video>
+      <div style="margin-top:5px;font-size:11px;color:#94a3b8;">
+        <a href="{{ a.video_url }}" target="_blank"
+           style="color:#7c3aed;text-decoration:none;">↓ ダウンロード</a>
+      </div>
+    </div>
+    {% endif %}
+
     <!-- アクション -->
     <div class="row-actions">
       <a href="/articles/{{ a.id }}/edit" class="btn btn-ghost btn-sm">✏️ 編集</a>

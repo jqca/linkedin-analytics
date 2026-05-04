@@ -129,6 +129,23 @@
     </div>
   </div>
 
+  <!-- デモ動画URL -->
+  <div class="form-group">
+    <label>🎬 デモ動画URL（任意）</label>
+    <input type="url" name="video_url"
+           value="{{ article.video_url if article and article.video_url else '' }}"
+           placeholder="例：https://maint-ai-production.up.railway.app/static/demo.mp4"
+           style="font-family:monospace;font-size:13px;">
+    {% if article and article.video_url %}
+    <div style="margin-top:8px;">
+      <video controls preload="metadata"
+             style="width:100%;max-width:480px;border-radius:8px;border:1px solid #e2e8f0;">
+        <source src="{{ article.video_url }}" type="video/mp4">
+      </video>
+    </div>
+    {% endif %}
+  </div>
+
   <!-- Main content + sidebar -->
   <div class="content-wrap">
 

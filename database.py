@@ -54,7 +54,17 @@ def _is_pg(conn) -> bool:
 
 
 def _migrate(conn, pg):
-    """マイグレーション（冪等）: article_variants / followers テーブルを追加"""
+    """マイグレーション（冪等）: article_variants / followers / video_url カラムを追加"""
+    # video_url カラムを articles に追加（既存DB対応）
+    try:
+        if pg:
+            conn.execute("ALTER TABLE articles ADD COLUMN video_url TEXT DEFAULT ''")
+        else:
+            conn.execute("ALTER TABLE articles ADD COLUMN video_url TEXT DEFAULT ''")
+        conn.commit()
+    except Exception:
+        pass  # カラムが既に存在する場合は無視
+
     if pg:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS article_variants (

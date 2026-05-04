@@ -883,10 +883,11 @@ def articles_new():
         content = request.form.get("content", "").strip()
         status = request.form.get("status", "draft")
         scheduled_date = request.form.get("scheduled_date", "")
+        video_url = request.form.get("video_url", "").strip()
         conn = get_conn()
         conn.execute(
-            "INSERT INTO articles (title, content, status, scheduled_date) VALUES (?, ?, ?, ?)",
-            (title, content, status, scheduled_date)
+            "INSERT INTO articles (title, content, status, scheduled_date, video_url) VALUES (?, ?, ?, ?, ?)",
+            (title, content, status, scheduled_date, video_url)
         )
         conn.commit()
         conn.close()
@@ -906,10 +907,11 @@ def articles_edit(aid):
         content = request.form.get("content", "").strip()
         status = request.form.get("status", "draft")
         scheduled_date = request.form.get("scheduled_date", "")
+        video_url = request.form.get("video_url", "").strip()
         conn.execute(
             "UPDATE articles SET title=?, content=?, status=?, scheduled_date=?, "
-            "updated_at=datetime('now') WHERE id=?",
-            (title, content, status, scheduled_date, aid)
+            "video_url=?, updated_at=datetime('now') WHERE id=?",
+            (title, content, status, scheduled_date, video_url, aid)
         )
         conn.commit()
         conn.close()
