@@ -45,6 +45,9 @@ class _PGConn:
     def commit(self):
         self._conn.commit()
 
+    def rollback(self):
+        self._conn.rollback()
+
     def close(self):
         self._conn.close()
 
@@ -63,6 +66,8 @@ def _migrate(conn, pg):
             conn.execute("ALTER TABLE articles ADD COLUMN video_url TEXT DEFAULT ''")
         conn.commit()
     except Exception:
+        if pg:
+            conn.rollback()  # PostgreSQL: aborted transaction must be rolled back
         pass  # カラムが既に存在する場合は無視
 
     if pg:
