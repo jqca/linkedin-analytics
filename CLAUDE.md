@@ -5,7 +5,7 @@
 核心主張の登録・記事の作成と保存・投稿スケジュール管理・マルチプラットフォーム転用・YouTube動画要約・書籍化進捗トラッカーが主な機能。
 
 ## 基本情報
-- **本番URL**: https://linkedin-analytics-production-d434.up.railway.app
+- **本番URL**: https://linkedin-management.up.railway.app
 - **パスワード**: linkedin2026（環境変数 APP_PASSWORD）
 - **GitHub**: jqca/linkedin-analytics（ブランチ: `master`）
 - **インフラ**: Railway（Webサービス + PostgreSQL）
@@ -46,7 +46,7 @@ linkedin-analytics/
 ├── database.py               # SQLite/PG両対応・init_db・_migrate
 ├── requirements.txt
 ├── Procfile                  # gunicorn --workers 1 --timeout 120
-├── index.html                # 分析ダッシュボード（静的）+ 書籍化進捗カード
+├── index.html                # 分析ダッシュボード: KPIサマリー・フォロワー推移・インプレッション推移・書籍化進捗
 └── templates/
     ├── base_app.html              # ナビ共通レイアウト
     ├── login.html
@@ -79,6 +79,9 @@ article_variants (id, article_id, platform, title, content, url, status, created
 
 -- フォロワー数記録
 followers (id, count, recorded_at DATE UNIQUE, source)
+
+-- インプレッション数記録
+impressions (id, count, recorded_at DATE UNIQUE, source)
 ```
 
 ## database.py の注意点
@@ -94,7 +97,7 @@ followers (id, count, recorded_at DATE UNIQUE, source)
 | 機能 | URL | 説明 |
 |------|-----|------|
 | ログイン | /login | セッションベース認証 |
-| ダッシュボード | / | 書籍化進捗・フォロワー推移 |
+| ダッシュボード | / | KPIサマリー・フォロワー推移・インプレッション推移・書籍化進捗 |
 | 核心主張 | /beliefs | CRUD |
 | 記事管理 | /articles | スケジュール・投稿済み・プラットフォーム別タブ |
 | 記事作成 | /articles/new | video_url フィールド含む |
@@ -104,6 +107,7 @@ followers (id, count, recorded_at DATE UNIQUE, source)
 | YouTube要約 | /youtube-summary | Claude APIで要約 → 記事ドラフト |
 | 運用フロー | /workflow | 投稿手順ガイド |
 | フォロワーAPI | /api/followers | GET: 履歴JSON / POST: Bearer認証でupsert |
+| インプレッションAPI | /api/impressions | GET: 履歴JSON / POST: Bearer認証でupsert |
 | 統計API | /api/stats | posted/scheduled/draft件数・達成率・完成予想 |
 
 ## 自動投稿の仕組み
@@ -130,11 +134,16 @@ Railway のプロキシが30秒でHTTP接続を切断するため：
 | 第6弾（品質検査） | https://quality-inspector-production.up.railway.app/static/promo.mp4 |
 | 第7弾（MaintAI） | https://maint-ai-production.up.railway.app/static/demo.mp4 |
 
-## フォロワー数自動記録
+## フォロワー数・インプレッション数 自動記録
 - スクレイパー: `C:/Users/User/company/development/linkedin-auto-connect/scrape_followers.py`
-- Playwright+CDP（ポート9223）でLinkedInからフォロワー数取得
-- タスクスケジューラ: `schedule_followers.ps1`（毎朝8:00）
+- Playwright+CDP（ポート9223）で `/in/me/` プロフィールページ → フォロワー数、`/feed/` → インプレッション数を取得
+- `/api/followers` と `/api/impressions` に別々にPOST
+- **Windowsタスクスケジューラ**: タスク名 `LinkedIn_ScrapeFollowers`、毎朝 **09:00** に自動実行
+  - `WakeToRun: true`（PCがスリープ中でも自動起動して実行）
+  - PCをシャットダウンせずスリープにしておくこと
+  - 登録スクリプト: `schedule_followers.ps1`（変更時は再実行）
 - 認証: `Authorization: Bearer linkedin2026`
+- ログ: `linkedin-auto-connect/logs/followers_YYYYMMDD_HHMMSS.log`
 
 ## 投稿スケジュール（2026-05-04時点）
 | 弾 | タイトル | ステータス | 日付 |
