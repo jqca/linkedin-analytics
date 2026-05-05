@@ -705,6 +705,63 @@ def api_followers_post():
     return jsonify({"ok": True, "count": count, "date": date_str, "action": action})
 
 
+# ── インプレッション API ────────────────────────────────────────────────────────
+
+@app.route("/api/impressions", methods=["GET"])
+def api_impressions_get():
+    """インプレッション数の履歴を返す（認証不要・公開）"""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT count, recorded_at FROM impressions ORDER BY recorded_at ASC"
+    ).fetchall()
+    conn.close()
+    data = [{"count": r["count"], "date": str(r["recorded_at"])} for r in rows]
+    result = {"history": data}
+    if data:
+        result["latest"]      = data[-1]["count"]
+        result["latest_date"] = data[-1]["date"]
+        result["diff"]        = data[-1]["count"] - data[-2]["count"] if len(data) >= 2 else 0
+    else:
+        result["latest"]      = None
+        result["latest_date"] = None
+        result["diff"]        = 0
+    return jsonify(result)
+
+
+@app.route("/api/impressions", methods=["POST"])
+def api_impressions_post():
+    """インプレッション数を記録する（Bearer トークン認証必須）"""
+    auth = request.headers.get("Authorization", "")
+    if auth != f"Bearer {APP_PASSWORD}":
+        return jsonify({"error": "unauthorized"}), 401
+    data     = request.get_json(silent=True) or {}
+    count    = data.get("count")
+    if not isinstance(count, int) or count < 0:
+        return jsonify({"error": "count must be a non-negative integer"}), 400
+    date_str = data.get("date") or datetime.now(JST).date().isoformat()
+    source   = data.get("source", "scrape")
+
+    conn = get_conn()
+    existing = conn.execute(
+        "SELECT id FROM impressions WHERE recorded_at = ?", (date_str,)
+    ).fetchone()
+    if existing:
+        conn.execute(
+            "UPDATE impressions SET count = ?, source = ? WHERE recorded_at = ?",
+            (count, source, date_str)
+        )
+        action = "updated"
+    else:
+        conn.execute(
+            "INSERT INTO impressions (count, recorded_at, source) VALUES (?, ?, ?)",
+            (count, date_str, source)
+        )
+        action = "inserted"
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "count": count, "date": date_str, "action": action})
+
+
 # ── Make Webhook → LinkedIn ───────────────────────────────────────────────────
 
 def _make_post_to_linkedin(webhook_url: str, content: str, title: str = "") -> None:

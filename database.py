@@ -93,6 +93,14 @@ def _migrate(conn, pg):
                 source      TEXT DEFAULT 'scrape'
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS impressions (
+                id          SERIAL PRIMARY KEY,
+                count       INTEGER NOT NULL,
+                recorded_at DATE NOT NULL UNIQUE,
+                source      TEXT DEFAULT 'scrape'
+            )
+        """)
     else:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS article_variants (
@@ -110,6 +118,14 @@ def _migrate(conn, pg):
         """)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS followers (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                count       INTEGER NOT NULL,
+                recorded_at TEXT NOT NULL UNIQUE,
+                source      TEXT DEFAULT 'scrape'
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS impressions (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 count       INTEGER NOT NULL,
                 recorded_at TEXT NOT NULL UNIQUE,

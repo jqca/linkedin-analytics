@@ -155,6 +155,50 @@
     .follower-diff.negative { background: #fee2e2; color: #dc2626; }
     .follower-chart-wrap { position: relative; height: 200px; margin-top: 16px; }
 
+    /* KPI summary card */
+    .kpi-summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 700px) { .kpi-summary { grid-template-columns: 1fr; } }
+    .kpi-item {
+      background: var(--card); border-radius: 14px; padding: 20px 22px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 10px rgba(0,0,0,.05);
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .kpi-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; }
+    .kpi-val { font-size: 36px; font-weight: 800; color: var(--li); line-height: 1.1; }
+    .kpi-item.kpi-green .kpi-val  { color: #16a34a; }
+    .kpi-item.kpi-amber .kpi-val  { color: var(--amber); }
+    .kpi-diff-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+    .kpi-badge {
+      display: inline-block; border-radius: 999px; padding: 2px 10px;
+      font-size: 11px; font-weight: 700;
+      background: #dcfce7; color: #15803d;
+    }
+    .kpi-badge.neg { background: #fee2e2; color: #dc2626; }
+    .kpi-badge.neutral { background: #f1f5f9; color: var(--muted); }
+    .kpi-sub { font-size: 11px; color: var(--muted); }
+
+    /* Impression trend card */
+    .impression-trend-card {
+      background: var(--card); border-radius: 12px; padding: 20px 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    .impression-trend-header { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 4px; }
+    .impression-count-big { font-size: 42px; font-weight: 800; color: #16a34a; line-height: 1; }
+    .impression-count-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .impression-diff {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 13px; font-weight: 700; padding: 3px 10px;
+      border-radius: 999px; background: #dcfce7; color: #15803d;
+    }
+    .impression-diff.negative { background: #fee2e2; color: #dc2626; }
+    .impression-chart-wrap { position: relative; height: 180px; margin-top: 16px; }
+
     /* Book progress card */
     .book-card {
       background: linear-gradient(135deg, #fef9f0 0%, #fffbf5 100%);
@@ -279,7 +323,35 @@
     </div>
   </div>
 
-  <!-- Book Progress -->
+  <!-- KPI サマリー -->
+  <div class="section-label">📊 KPI集計サマリー</div>
+  <div class="kpi-summary">
+    <div class="kpi-item">
+      <div class="kpi-label">フォロワー数</div>
+      <div class="kpi-val" id="kpi-followers">—</div>
+      <div class="kpi-diff-row">
+        <span class="kpi-badge neutral" id="kpi-followers-badge">取得中</span>
+        <span class="kpi-sub" id="kpi-followers-date"></span>
+      </div>
+    </div>
+    <div class="kpi-item kpi-green">
+      <div class="kpi-label">コンテンツインプレッション</div>
+      <div class="kpi-val" id="kpi-impressions">—</div>
+      <div class="kpi-diff-row">
+        <span class="kpi-badge neutral" id="kpi-impressions-badge">取得中</span>
+        <span class="kpi-sub" id="kpi-impressions-date"></span>
+      </div>
+    </div>
+    <div class="kpi-item kpi-amber">
+      <div class="kpi-label">書籍化進捗</div>
+      <div class="kpi-val" id="kpi-posted-top">—</div>
+      <div class="kpi-diff-row">
+        <span class="kpi-sub">/ 100 投稿</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Follower trend -->
   <div class="section-label">📈 フォロワー数推移</div>
   <div class="follower-trend-card">
     <div class="follower-trend-header">
@@ -294,6 +366,25 @@
       <canvas id="followerChart"></canvas>
     </div>
     <div style="font-size:11px;color:var(--muted);margin-top:8px;text-align:right" id="ft-note">
+      自動取得（毎日更新）
+    </div>
+  </div>
+
+  <!-- Impression trend -->
+  <div class="section-label">💬 コンテンツインプレッション推移</div>
+  <div class="impression-trend-card">
+    <div class="impression-trend-header">
+      <div>
+        <div class="impression-count-label">最新インプレッション数</div>
+        <div class="impression-count-big" id="imp-count">—</div>
+      </div>
+      <div id="imp-diff-badge" class="impression-diff" style="display:none"></div>
+      <div style="margin-left:auto;font-size:11px;color:var(--muted)" id="imp-date"></div>
+    </div>
+    <div class="impression-chart-wrap">
+      <canvas id="impressionChart"></canvas>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px;text-align:right" id="imp-note">
       自動取得（毎日更新）
     </div>
   </div>
@@ -553,6 +644,17 @@
       const badge = document.getElementById('hdr-follower-badge');
       badge.textContent = `${sign} ${Math.abs(d.diff)} 前日比`;
       badge.style.background = d.diff >= 0 ? 'rgba(255,255,255,.2)' : 'rgba(220,38,38,.3)';
+
+      // KPI card — followers
+      document.getElementById('kpi-followers').textContent =
+        d.latest.toLocaleString('ja-JP');
+      const kpiBadge = document.getElementById('kpi-followers-badge');
+      kpiBadge.textContent = d.diff >= 0
+        ? `▲ +${d.diff.toLocaleString('ja-JP')} 前日比`
+        : `▼ ${d.diff.toLocaleString('ja-JP')} 前日比`;
+      kpiBadge.className = 'kpi-badge' + (d.diff < 0 ? ' neg' : '');
+      document.getElementById('kpi-followers-date').textContent =
+        d.latest_date ? d.latest_date : '';
     }
 
     // Big count card
@@ -643,6 +745,8 @@
     document.getElementById('bp-posted').textContent = d.posted;
     document.getElementById('bp-scheduled').textContent = d.scheduled;
     document.getElementById('bp-draft').textContent = d.draft;
+    // KPI card — posted count
+    document.getElementById('kpi-posted-top').textContent = d.posted;
     document.getElementById('bp-pct-label').textContent =
       `達成率 ${d.pct}%（残り${d.remaining}投稿）`;
     document.getElementById('bp-bar').style.width = Math.min(d.pct, 100) + '%';
@@ -653,6 +757,106 @@
       `${d.est_year}年 ${monthNames[d.est_month - 1]}`;
   } catch(e) {
     // silently skip if not logged in
+  }
+})();
+
+// Impression trend fetch & chart
+(async function() {
+  try {
+    const res = await fetch('/api/impressions');
+    if (!res.ok) return;
+    const d = await res.json();
+
+    if (d.latest !== null && d.latest !== undefined) {
+      // Big count
+      document.getElementById('imp-count').textContent =
+        d.latest.toLocaleString('ja-JP');
+      document.getElementById('imp-date').textContent =
+        d.latest_date ? `最終更新: ${d.latest_date}` : '';
+
+      // Diff badge
+      const diffBadge = document.getElementById('imp-diff-badge');
+      if (d.diff !== 0) {
+        diffBadge.style.display = 'inline-flex';
+        const sign = d.diff >= 0 ? '▲ +' : '▼ ';
+        diffBadge.textContent = `${sign}${d.diff.toLocaleString('ja-JP')} (前日比)`;
+        if (d.diff < 0) diffBadge.classList.add('negative');
+      }
+
+      // KPI card — impressions
+      document.getElementById('kpi-impressions').textContent =
+        d.latest.toLocaleString('ja-JP');
+      const kpiBadge = document.getElementById('kpi-impressions-badge');
+      if (d.diff !== 0) {
+        kpiBadge.textContent = d.diff >= 0
+          ? `▲ +${d.diff.toLocaleString('ja-JP')} 前日比`
+          : `▼ ${d.diff.toLocaleString('ja-JP')} 前日比`;
+        kpiBadge.className = 'kpi-badge' + (d.diff < 0 ? ' neg' : '');
+      } else {
+        kpiBadge.textContent = '前日比 ±0';
+        kpiBadge.className = 'kpi-badge neutral';
+      }
+      document.getElementById('kpi-impressions-date').textContent =
+        d.latest_date ? d.latest_date : '';
+    } else {
+      document.getElementById('imp-count').textContent = '記録なし';
+      document.getElementById('imp-note').textContent =
+        'scrape_followers.py を実行するとここに表示されます';
+      document.getElementById('kpi-impressions').textContent = '—';
+      const kpiBadge = document.getElementById('kpi-impressions-badge');
+      kpiBadge.textContent = 'データなし';
+      kpiBadge.className = 'kpi-badge neutral';
+    }
+
+    // Chart
+    if (d.history && d.history.length > 0) {
+      const labels = d.history.map(r => r.date);
+      const counts = d.history.map(r => r.count);
+      const ctx = document.getElementById('impressionChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'インプレッション数',
+            data: counts,
+            borderColor: '#16a34a',
+            backgroundColor: 'rgba(22,163,74,.08)',
+            borderWidth: 2.5,
+            pointRadius: counts.length > 30 ? 0 : 4,
+            pointHoverRadius: 6,
+            fill: true,
+            tension: 0.35,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => ` ${ctx.parsed.y.toLocaleString('ja-JP')}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { maxTicksLimit: 8, font: { size: 10 }, maxRotation: 0 },
+              grid: { display: false }
+            },
+            y: {
+              ticks: { font: { size: 10 }, callback: v => v.toLocaleString('ja-JP') },
+              grid: { color: 'rgba(0,0,0,.05)' }
+            }
+          }
+        }
+      });
+    } else {
+      document.getElementById('impressionChart').parentElement.innerHTML =
+        '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:13px">データがありません。scrape_followers.py を実行してください。</div>';
+    }
+  } catch(e) {
+    console.warn('Impression data fetch failed:', e);
   }
 })();
 

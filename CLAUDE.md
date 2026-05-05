@@ -126,8 +126,8 @@ Railway のプロキシが30秒でHTTP接続を切断するため：
 
 | 記事 | video_url |
 |------|-----------|
-| 第5弾（生産計画） | https://manufacturing-scheduler-production.up.railway.app/static/demo.mp4 |
-| 第6弾（品質検査） | https://quality-inspector-production.up.railway.app/static/demo.mp4 |
+| 第5弾（生産計画） | https://manufacturing-scheduler-production.up.railway.app/static/qscheduler_promo_90s.mp4 |
+| 第6弾（品質検査） | https://quality-inspector-production.up.railway.app/static/promo.mp4 |
 | 第7弾（MaintAI） | https://maint-ai-production.up.railway.app/static/demo.mp4 |
 
 ## フォロワー数自動記録
