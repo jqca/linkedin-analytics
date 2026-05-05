@@ -611,14 +611,14 @@ def api_stats():
     PACE_PER_WEEK = 2
     conn = get_conn()
     posted = conn.execute(
-        "SELECT COUNT(*) FROM articles WHERE status='posted'"
-    ).fetchone()[0]
+        "SELECT COUNT(*) AS c FROM articles WHERE status='posted'"
+    ).fetchone()['c']
     scheduled = conn.execute(
-        "SELECT COUNT(*) FROM articles WHERE status='scheduled'"
-    ).fetchone()[0]
+        "SELECT COUNT(*) AS c FROM articles WHERE status='scheduled'"
+    ).fetchone()['c']
     draft = conn.execute(
-        "SELECT COUNT(*) FROM articles WHERE status='draft'"
-    ).fetchone()[0]
+        "SELECT COUNT(*) AS c FROM articles WHERE status='draft'"
+    ).fetchone()['c']
     conn.close()
 
     remaining = max(TARGET - posted, 0)
