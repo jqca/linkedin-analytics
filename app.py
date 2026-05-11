@@ -764,13 +764,30 @@ def api_impressions_post():
 
 # ── Make Webhook → LinkedIn ───────────────────────────────────────────────────
 
-def _make_post_to_linkedin(webhook_url: str, content: str, title: str = "") -> None:
-    """Make の Custom Webhook 経由で LinkedIn に投稿する"""
-    r = httpx.post(
-        webhook_url,
-        json={"content": content, "title": title},
-        timeout=15,
-    )
+def _make_post_to_linkedin(
+    webhook_url: str,
+    content: str,
+    title: str = "",
+    video_url: str = "",
+) -> None:
+    """Make の Custom Webhook 経由で LinkedIn に投稿する。
+
+    payload:
+      - content      : 投稿本文
+      - title        : 記事タイトル
+      - video_url    : 動画ファイル(MP4)の公開URL。Make 側で
+                       LinkedIn ネイティブ動画アップロードに利用する。
+                       未指定または空文字なら従来通りテキストのみ投稿。
+      - media_type   : "video"（video_url あり）または "text"。
+                       Make シナリオ内のルーター分岐用フィールド。
+    """
+    payload = {
+        "content": content,
+        "title": title,
+        "video_url": video_url or "",
+        "media_type": "video" if video_url else "text",
+    }
+    r = httpx.post(webhook_url, json=payload, timeout=30)
     r.raise_for_status()
 
 
@@ -790,9 +807,14 @@ def articles_post_to_linkedin(aid):
     if request.method == "POST":
         content = request.form.get("content", "").strip()
         title   = article["title"] or ""
+        # 動画URLは記事に紐付いたものを使用（migration済みなので常に列あり）
+        try:
+            video_url = (article["video_url"] or "").strip()
+        except (KeyError, IndexError):
+            video_url = ""
 
         try:
-            _make_post_to_linkedin(webhook_url, content, title)
+            _make_post_to_linkedin(webhook_url, content, title, video_url=video_url)
         except Exception as e:
             return render_template(
                 "linkedin_post.html",
