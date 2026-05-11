@@ -139,11 +139,40 @@ Railway のプロキシが30秒でHTTP接続を切断するため：
 - Playwright+CDP（ポート9223）で `/in/me/` プロフィールページ → フォロワー数、`/feed/` → インプレッション数を取得
 - `/api/followers` と `/api/impressions` に別々にPOST
 - **Windowsタスクスケジューラ**: タスク名 `LinkedIn_ScrapeFollowers`、毎朝 **09:00** に自動実行
-  - `WakeToRun: true`（PCがスリープ中でも自動起動して実行）
-  - PCをシャットダウンせずスリープにしておくこと
-  - 登録スクリプト: `schedule_followers.ps1`（変更時は再実行）
+  - `WakeToRun: False`（PCを無理にスリープから起こさない・2026-05-11 変更）
+  - `StartWhenAvailable: True`（PCを起こした時点で未実行分を自動でキャッチアップ）
+  - `ExecutionTimeLimit: 15分`
+  - 登録スクリプト: `schedule_followers.ps1`（UTF-8 BOM付き）
+  - 設定変更後、`Set-ScheduledTask` または `schedule_followers.ps1` 再実行で反映
 - 認証: `Authorization: Bearer linkedin2026`
 - ログ: `linkedin-auto-connect/logs/followers_YYYYMMDD_HHMMSS.log`
+
+### 過去のバッチ失敗事例（2026-05-06〜05-10）
+- 原因: `WakeToRun=True` でPCをスリープから強制起床していた
+- 起床直後の `AppData\Local` 可視性問題で `linkedin-auto-chrome` プロファイルフォルダが見えず、スクリプトのリトライ計5分でも失敗
+- 修正: `WakeToRun=False` + `StartWhenAvailable=True` で解決（PCが起きてれば即実行、寝てたらスキップしてユーザーがPC起こした時に自動実行）
+- 教訓: ノートPC・デスクトップ問わず、`WakeToRun` はAppDataアクセスを伴うバッチでは避ける
+
+## LinkedIn ネイティブ動画アップロード（2026-05-11 追加）
+- 動画URLをテキストに書き込むとリンク表示にしかならない → ネイティブ動画として投稿するには、Make経由でLinkedIn API の動画アップロード機能を呼び出す
+- アプリ側（`_make_post_to_linkedin`）でWebhook payloadに `video_url` と `media_type` を追加送信
+- payload:
+  ```json
+  {
+    "content": "本文...",
+    "title": "タイトル",
+    "video_url": "https://maint-ai-production.up.railway.app/static/demo.mp4",
+    "media_type": "video"  // 動画なしの記事は "text"
+  }
+  ```
+- Makeシナリオ側: Router で `media_type` 値により分岐
+  - **video ルート**: LinkedIn → Upload Video → Create a Share with Video（Commentary: `{{1.content}}`, Video URL: `{{1.video_url}}`）
+  - **text ルート**: 既存のLinkedIn → Create a Post（Commentary: `{{1.content}}`）
+- UI改善: `linkedin_post.html` に動画あり記事用の緑バナー＋プレビュー＋「本文中のURL行は削除推奨」リマインダー追加
+- 動画URL要件:
+  - 外部から直接ダウンロード可能（Cloudflare認証・Basic認証NG）
+  - MP4 / MOV / 最大10分 / 5GB / 推奨1080p
+  - Railway `/static/xxx.mp4` のような直接URLが理想
 
 ## 投稿スケジュール（2026-05-04時点）
 | 弾 | タイトル | ステータス | 日付 |
@@ -165,3 +194,39 @@ Railway のプロキシが30秒でHTTP接続を切断するため：
 - YouTube字幕の自動取得はRailwayのIPがブロックされる場合あり → 手動貼り付けタブで代替
 - X投稿はMakeのTwitterモジュールが廃止 → Tweepy直接接続で解決
 - X API: OAuth1.0a の4キー（Consumer Key/Secret + Access Token/Secret）がすべて必要
+
+## Design System
+
+### Theme
+- Light mode, LinkedIn brand aesthetic
+
+### Colors
+| Token | Value | Usage |
+|-------|-------|-------|
+| primary | #0077B5 | LinkedIn blue |
+| primary-dark | #005885 | Hover state |
+| primary-light | #00a0dc | Light accent |
+| primary-bg | #e8f4fb | Light blue background |
+| bg | #f1f5f9 | Page background |
+| surface | #ffffff | Card background |
+| text | #1e293b | Primary text |
+| text-muted | #64748b | Secondary text |
+| border | #e2e8f0 | Borders |
+| header | #0f172a | Dark header bg |
+| green | #16a34a | Success |
+| amber | #d97706 | Warning |
+| red | #dc2626 | Error |
+| purple | #8b5cf6 | Analytics accent |
+| teal | #14b8a6 | Chart accent |
+
+### Typography
+- System fonts: `Hiragino Sans`, `Noto Sans JP`, `Yu Gothic`
+
+### Spacing / Radius
+- Card radius: `16px`
+
+### Component Patterns
+- Header: dark gradient with LinkedIn branding
+- Cards: white bg, rounded, subtle shadow
+- Charts: bar charts with gradient fills
+- Insight cards: dark bg with gradient overlay
