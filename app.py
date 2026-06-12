@@ -853,6 +853,106 @@ def articles_send_to_buffer(aid):
     return redirect(url_for("articles_post_to_linkedin", aid=aid))
 
 
+# ── 統合自動投稿 API（承認 → LinkedIn → 続けて X を1回で実行）──────────────────
+@app.route("/api/publish", methods=["POST"])
+def api_publish():
+    """AICockpit の「承認ボタン」から呼ばれる統合投稿API（Bearer 認証必須）。
+
+    社長が承認した投稿を、LinkedIn（Make Webhook）に投稿 → 続けて X（Tweepy）に
+    投稿する。LinkedIn と X を1リクエストで連続実行し、各チャネルの結果を返す。
+
+    body(JSON):
+      - linkedin_text : LinkedIn 投稿本文（必須・空なら LinkedIn はスキップ）
+      - x_text        : X 本文（任意・━━━ でスレッド分割可）。未指定なら X はスキップ
+      - title         : 記事タイトル（任意・履歴/動画ルート用）
+      - video_url     : 動画MP4の公開URL（任意・LinkedInネイティブ動画）
+      - to_x          : X にも投稿するか（既定 True）
+      - dry_run       : True なら実投稿せず「何が投稿されるか」と設定状況のみ返す
+    """
+    auth = request.headers.get("Authorization", "")
+    if auth != f"Bearer {APP_PASSWORD}":
+        return jsonify({"error": "unauthorized"}), 401
+
+    data = request.get_json(force=True, silent=True) or {}
+    linkedin_text = (data.get("linkedin_text") or "").strip()
+    x_text        = (data.get("x_text") or "").strip()
+    title         = (data.get("title") or "").strip()
+    video_url     = (data.get("video_url") or "").strip()
+    to_x          = bool(data.get("to_x", True))
+    dry_run       = bool(data.get("dry_run", False))
+
+    if not linkedin_text and not (to_x and x_text):
+        return jsonify({"error": "linkedin_text または x_text が必要です"}), 400
+
+    # Xスレッド分割（━━━区切り。区切りが無ければ全文を1ツイートとして扱う）
+    x_tweets = [t.strip() for t in x_text.split("━━━") if t.strip()] if x_text else []
+    if x_text and not x_tweets:
+        x_tweets = [x_text]
+
+    result = {"ok": True, "dry_run": dry_run,
+              "linkedin": {"status": "skipped"}, "x": {"status": "skipped"}}
+
+    webhook_url = os.environ.get("MAKE_WEBHOOK_URL", "")
+    x_missing = [k for k in ("X_CONSUMER_KEY", "X_CONSUMER_SECRET",
+                             "X_ACCESS_TOKEN", "X_ACCESS_TOKEN_SECRET")
+                 if not os.environ.get(k)]
+
+    # ── dry_run: 実投稿せず、投稿予定の概要＋設定状況だけ返す（安全検証用）──────
+    if dry_run:
+        if linkedin_text:
+            result["linkedin"] = {"status": "would_post", "chars": len(linkedin_text),
+                                  "media_type": "video" if video_url else "text"}
+        if to_x and x_tweets:
+            result["x"] = {"status": "would_post", "tweets": len(x_tweets)}
+        result["config"] = {"make_webhook_set": bool(webhook_url),
+                            "x_keys_missing": x_missing,
+                            "x_username": os.environ.get("X_USERNAME", "(未設定)")}
+        return jsonify(result)
+
+    # ── 1) LinkedIn 投稿（Make Webhook）──────────────────────────────────────
+    if linkedin_text:
+        if not webhook_url:
+            result["linkedin"] = {"status": "error", "error": "MAKE_WEBHOOK_URL 未設定"}
+            result["ok"] = False
+        else:
+            try:
+                _make_post_to_linkedin(webhook_url, linkedin_text, title, video_url=video_url)
+                result["linkedin"] = {"status": "posted"}
+            except Exception as e:
+                result["linkedin"] = {"status": "error", "error": f"{type(e).__name__}: {e}"}
+                result["ok"] = False
+
+    # ── 2) 続けて X 投稿（Tweepy・スレッド）──────────────────────────────────
+    if to_x and x_tweets:
+        if x_missing:
+            result["x"] = {"status": "error", "error": f"環境変数未設定: {', '.join(x_missing)}"}
+            result["ok"] = False
+        else:
+            try:
+                first_id = _post_to_x(x_tweets)
+                x_url = f"https://x.com/{os.environ.get('X_USERNAME', 'i')}/status/{first_id}"
+                result["x"] = {"status": "posted", "url": x_url, "tweets": len(x_tweets)}
+            except Exception as e:
+                result["x"] = {"status": "error", "error": f"{type(e).__name__}: {e}"}
+                result["ok"] = False
+
+    # ── 3) 履歴に記録（書籍化進捗・投稿済み一覧に反映）──────────────────────────
+    if result["linkedin"].get("status") == "posted" or result["x"].get("status") == "posted":
+        try:
+            conn = get_conn()
+            conn.execute(
+                "INSERT INTO articles (title, content, status, video_url) "
+                "VALUES (?, ?, 'posted', ?)",
+                (title or linkedin_text[:40], linkedin_text or x_text, video_url)
+            )
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
+    return jsonify(result)
+
+
 # ── 核心主張 (Beliefs) ────────────────────────────────────────────────────────
 @app.route("/beliefs")
 @login_required

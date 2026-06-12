@@ -138,6 +138,9 @@ Railway のプロキシが30秒でHTTP接続を切断するため：
 - スクレイパー: `C:/Users/User/company/development/linkedin-auto-connect/scrape_followers.py`
 - Playwright+CDP（ポート9223）で `/in/me/` プロフィールページ → フォロワー数、`/feed/` → インプレッション数を取得
 - `/api/followers` と `/api/impressions` に別々にPOST
+- **プロファイルパス（2026-05-11 変更）**: `C:\Users\User\company\development\linkedin-auto-connect\chrome-profile`
+  - 旧: `C:\Users\User\AppData\Local\linkedin-auto-chrome`
+  - 移動理由: Claude Desktop の UWP サンドボックス仮想化により、`AppData\Local` 配下が Claude経由実行とタスクスケジューラ実行で異なるパスを指していたため
 - **Windowsタスクスケジューラ**: タスク名 `LinkedIn_ScrapeFollowers`、毎朝 **09:00** に自動実行
   - `WakeToRun: False`（PCを無理にスリープから起こさない・2026-05-11 変更）
   - `StartWhenAvailable: True`（PCを起こした時点で未実行分を自動でキャッチアップ）
@@ -147,11 +150,14 @@ Railway のプロキシが30秒でHTTP接続を切断するため：
 - 認証: `Authorization: Bearer linkedin2026`
 - ログ: `linkedin-auto-connect/logs/followers_YYYYMMDD_HHMMSS.log`
 
-### 過去のバッチ失敗事例（2026-05-06〜05-10）
-- 原因: `WakeToRun=True` でPCをスリープから強制起床していた
-- 起床直後の `AppData\Local` 可視性問題で `linkedin-auto-chrome` プロファイルフォルダが見えず、スクリプトのリトライ計5分でも失敗
-- 修正: `WakeToRun=False` + `StartWhenAvailable=True` で解決（PCが起きてれば即実行、寝てたらスキップしてユーザーがPC起こした時に自動実行）
-- 教訓: ノートPC・デスクトップ問わず、`WakeToRun` はAppDataアクセスを伴うバッチでは避ける
+### 過去のバッチ失敗事例（2026-05-06〜05-11）
+- **真の原因**: Claude Desktop の **UWP サンドボックス仮想化**
+  - `AppData\Local\linkedin-auto-chrome` が実際には `AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local\linkedin-auto-chrome` に配置されていた
+  - `linkedin_connect.py --setup` を Claude経由で初回実行したため、プロファイルがサンドボックス内に作成された
+  - Claude経由実行ではサンドボックス内のパスが見えるが、タスクスケジューラ実行ではサンドボックス外の本来の `AppData\Local` を見るため、フォルダが「ない」と判定された
+- **誤診（2026-05-10）**: `WakeToRun=True` によるスリープ復帰後の可視性問題と推測したが、`WakeToRun=False` に変更しても 2026-05-11 09:00 のバッチが同じエラーで失敗 → 真の原因が判明
+- **真の解決（2026-05-11）**: プロファイルを `AppData\Local` 配下からプロジェクトディレクトリ（`linkedin-auto-connect\chrome-profile`）に移動。両コンテキストで同一パスが解決される
+- **教訓**: Claude Desktop からのスクリプト実行で `AppData\Local`、`Program Files` 等の Windows 保護領域に書き込むと UWP サンドボックスにリダイレクトされる。タスクスケジューラ・cron など他コンテキストとの共有が必要なファイルは保護領域外に配置する
 
 ## LinkedIn ネイティブ動画アップロード（2026-05-11 追加）
 - 動画URLをテキストに書き込むとリンク表示にしかならない → ネイティブ動画として投稿するには、Make経由でLinkedIn API の動画アップロード機能を呼び出す
